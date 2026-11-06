@@ -106,6 +106,7 @@ Future application servers must run in Docker (D-001).
 
 ## 4. Rules for this repo
 - Read D-001 before planning or implementing application servers.
+- Follow D-002 and `docs/design/DESIGN.md` for Figma approval and versioned local mocks.
 - No application implementation is currently authorized.
 - This setup authorizes no commit, merge, GitHub repository creation or push.
 - Explicit user restrictions override commit instructions in the workflow templates.
@@ -114,8 +115,12 @@ Future application servers must run in Docker (D-001).
 - In Codex, use `docs/agents/CODEX.md` to invoke the Graffino workflows.
 
 ## 5. Release
-The initial branch is `main`; there are no commits, remote or upstream at setup.
+At initial setup, the branch was `main`, without commits, remote or upstream.
+The repository is now published on GitHub at
+https://github.com/Fleseriu-Stefan/p28-companywatch.
+Remote `origin` points to that repository; local `main` tracks `origin/main`.
 No application version, changelog, deployment or release procedure exists.
+Existing publication does not authorize future commits, merges, pushes or deploys.
 Creating history or publishing requires the user's explicit authorization.
 
 ## 6. Definition of done

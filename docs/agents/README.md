@@ -15,8 +15,8 @@
 | See what another system expects from us | `CONTRACTS.md` (provided, consumed, external) |
 | Understand the structure | `ARCHITECTURE.md` |
 | See what is still unknown | `OPEN-QUESTIONS.md` |
-| UI work | `../design/DESIGN.md` (rules + procedure) and `../design/registry.yaml` (DS- IDs); a new screen is drawn in `../design/mocks/` and confirmed on the board first |
-| Show a design to people | "publish the board" (one way: repo → board; edits on the board are lost) |
+| UI work | `../design/DESIGN.md` (rules + procedure) and `../design/registry.yaml` (DS- IDs); create and visually approve in Figma, then preserve the approved representation in `../design/mocks/` before implementation (D-002) |
+| Show a design to people | Review a specific Figma version and explicitly confirm it; record the frame, approved version and date with the local mock. No Figma integration or board is configured. |
 | Explain old code | `DECISIONS-SUPERSEDED.md`, `PATTERNS-SUPERSEDED.md` (never obeyed) |
 | Re-check the ledger | `python3 docs/agents/tools/ledger-lint.py` (`--fix` rebuilds the indexes, `--next D` gives the next ID) |
 | Update this setup | `/graffino-agentic-code-setup` (needs the skill installed) |
@@ -37,7 +37,8 @@ pattern or contract, promote a candidate, or add a decision.
 <!-- graffino-agentic:end -->
 
 ## Initial setup and Codex CLI
-No application exists. D-001 is the only approved decision.
+No application exists. D-001 requires Docker for application servers;
+D-002 requires Figma approval and versioned local design mocks.
 Team, ClickUp and Slack addons are disabled.
 The slash commands above describe Claude Code workflows.
 For Codex invocation, tool mapping and current restrictions, read [CODEX.md](CODEX.md).

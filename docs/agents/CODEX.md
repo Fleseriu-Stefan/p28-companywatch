@@ -26,17 +26,26 @@ Do not assume Claude's `isolation: "worktree"` is a Codex tool argument.
 
 ## Initial repository and authorization
 This repository started on main, without commits, remote or upstream.
-Skip fetch/pull until a remote and upstream exist; report the reason.
+It is now published at https://github.com/Fleseriu-Stefan/p28-companywatch.
+Remote `origin` points to that repository; local `main` tracks `origin/main`.
+Follow AGENTS.md synchronization rules now that the remote and upstream exist.
 Explicit user authorization overrides automatic branch and commit steps in the original templates.
-Current permission covers setup files and verification only.
-No commit, merge, GitHub repository creation, push or application implementation is authorized.
+Current permission covers the approved six-file documentation update and verification only.
+Existing publication does not authorize future commits, merges, pushes or deploys.
+No commit, merge, push, deploy or application implementation is authorized by this update.
 Team, ClickUp and Slack addons are disabled; their conditional template sections do not apply.
 Do not create tickets, PRs, workflows or external messages.
 
 ## Design
 Keep local mocks, tokens and screenshots under docs/design/.
-No design board, publishing integration or screenshot command exists.
-Use explicit user confirmation for local designs; do not assume Claude board tools exist.
+D-002 and docs/design/DESIGN.md define Figma as the place to create and visually
+approve designs. Preserve the approved representations as versioned local mocks
+in docs/design/mocks/ and verify their correspondence to the approved Figma version
+before implementation. Record the frame reference, approved version and confirmation date.
+Implement from those approved local mocks and documented tokens.
+No Figma file link, Figma MCP integration, design board, publishing integration or
+screenshot command is configured. Do not assume access to Figma or Claude board tools,
+create a board or publish anything implicitly. Report unavailable access when needed.
 Q-004 blocks implementation until UI requirements and verification are confirmed.
 
 ## Verification

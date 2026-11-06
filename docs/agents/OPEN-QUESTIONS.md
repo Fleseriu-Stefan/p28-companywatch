@@ -35,3 +35,5 @@
 - **Status:** open
 - **Blocks:** UI implementation, registry entries, mocks and screenshot verification.
 - **Who answers:** Project owner.
+- **Partial answer:** On 2026-11-06, the user approved Figma for design creation and visual approval, with approved representations preserved and versioned in `docs/design/mocks/`; implementation must follow the approved version. See D-002 and ../design/DESIGN.md.
+- **Still open:** Screen requirements, token values, supported viewport sizes and the screenshot procedure. No Figma file link or Figma MCP integration is configured.
