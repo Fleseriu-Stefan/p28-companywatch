@@ -1,0 +1,46 @@
+# Keep original Graffino skills and agents versionable.
+.claude/*
+!.claude/skills/
+!.claude/agents/
+.claude/worktrees/
+
+# Environment variables; keep shareable examples versionable.
+.env
+.env.*
+!.env.example
+
+# Private keys and credentials.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+credentials
+credentials.json
+credentials.*.json
+secrets.json
+secrets.*.json
+.aws/
+.ssh/
+
+# Local caches, virtual environments and dependencies.
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+
+# Local tool, editor and machine configuration.
+*.local
+*.local.*
+.codex/
+.idea/
+.vscode/
+.npmrc
+.pypirc
+.netrc
+.docker/config.json
+.DS_Store
+Thumbs.db
