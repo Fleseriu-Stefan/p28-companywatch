@@ -11,4 +11,5 @@ _Avoid_: none specified.
 **Knowledge ledger** (noun) — The decisions, patterns, contracts and open questions under `docs/agents/`.
 _Avoid_: none specified.
 
-No application domain vocabulary has been confirmed. See OPEN-QUESTIONS.md, Q-001.
+The confirmed project purpose is ETL + API + Dashboard (D-005). No dataset-specific
+domain vocabulary or user roles have been confirmed; see docs/agents/OPEN-QUESTIONS.md, Q-001.

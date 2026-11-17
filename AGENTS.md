@@ -57,6 +57,9 @@ without new evidence. A rejected proposal is added there with the reason.
 - Tests first where the repo has tests. Never change what an existing test asserts
   to make code pass; an assertion you think is wrong goes to the user.
 - Never write a secret, token, password or personal data into a file, commit or log.
+  User-authorized local exception: MySQL passwords may be generated once and kept
+  in the untracked, Git-ignored `.env` with mode `600`. Never print or commit them;
+  preserve existing database credentials and data.
 - Never push, tag, release, or deploy without the user's go for that action.
 - When you cite past work, label the intent: **replicate** (only for an `approved`
   pattern) or **for awareness only**. History is not a template.
@@ -80,23 +83,41 @@ without new evidence. A rejected proposal is added there with the reason.
 <!-- graffino-agentic:end -->
 
 ## 1. What this repo is
-p28-companywatch is a new Tehnologii Web II laboratory repository.
-It currently contains agent working instructions only. No application exists yet.
-Application purpose and users remain open in `docs/agents/OPEN-QUESTIONS.md`.
+p28-companywatch is a Tehnologii Web II ETL + API + Dashboard project.
+M1 contains Docker infrastructure, health API, migration baseline and frontend
+tooling without visual UI. Domain data, ETL and dashboard remain unimplemented.
+See D-005 and `docs/CHECKPOINT.md`; ONRC is a candidate only.
 
 ## 2. Stack and commands
-Application stack: not selected. Python 3 runs the supplied ledger checker.
+Approved stack: React + TypeScript + Vite, FastAPI, MySQL, SQLAlchemy, PyMySQL,
+Alembic and Docker Compose (D-003). All application servers run in Docker (D-001).
+Install/build and local checks require credentials from the private local `.env`
+or exported environment variables, as described in README.md.
 
 ```bash
 python3 docs/agents/tools/ledger-lint.py --fix
 python3 docs/agents/tools/ledger-lint.py
+python3 scripts/verify.py
+docker compose build api frontend
+docker compose up -d --wait --wait-timeout 180 api
+docker compose run --rm --no-deps tests ruff check .
+docker compose run --rm --no-deps tests ruff format --check .
+docker compose run --rm --no-deps tests pytest -q -m 'not integration'
+docker compose run --rm --no-deps frontend
 ```
 
-Install, build, run, test, lint/type-check and screenshot commands: not run;
-no application, stack, test suite or screenshot tooling exists yet.
-Future application servers must run in Docker (D-001).
+`scripts/verify.py` runs real-MySQL integration tests and Compose smoke checks in
+an isolated project; never run the integration suite on the development database.
+Frontend command runs ESLint, TypeScript and Vite build. No UI or screenshot
+tooling is approved yet. Verification results: `docs/M1-VERIFICATION.md`.
 
 ## 3. Layout
+- `backend/`: FastAPI, database connectivity, Alembic and tests.
+- `frontend/`: React/TypeScript/Vite build tooling, no visual UI.
+- `compose.yaml`: db, migrate, api and optional tests/frontend tools.
+- `scripts/verify.py`: isolated Docker verification shared with CI.
+- `.github/workflows/ci.yml`: verification on pull requests and pushes to main.
+- `README.md`: installation, running, verification and troubleshooting.
 - `docs/agents/`: knowledge ledger, architecture, human guide and Codex compatibility.
 - `docs/design/`: design guardrails, empty registry, future mocks and screenshots.
 - `.claude/skills/`: original Graffino plan and build workflows.
@@ -107,7 +128,8 @@ Future application servers must run in Docker (D-001).
 ## 4. Rules for this repo
 - Read D-001 before planning or implementing application servers.
 - Follow D-002 and `docs/design/DESIGN.md` for Figma approval and versioned local mocks.
-- No application implementation is currently authorized.
+- M1 implementation and D-003–D-005/C-001 were explicitly approved on 2026-11-17.
+- Dataset-dependent work and UI implementation remain blocked by Q-005 and Q-004.
 - This setup authorizes no commit, merge, GitHub repository creation or push.
 - Explicit user restrictions override commit instructions in the workflow templates.
 - Team, ClickUp and Slack addons are disabled by user choice.
@@ -119,7 +141,8 @@ At initial setup, the branch was `main`, without commits, remote or upstream.
 The repository is now published on GitHub at
 https://github.com/Fleseriu-Stefan/p28-companywatch.
 Remote `origin` points to that repository; local `main` tracks `origin/main`.
-No application version, changelog, deployment or release procedure exists.
+M1 package metadata uses version 0.1.0; no release, changelog or deployment
+procedure is approved. See `docs/CHECKPOINT.md` for the missing public deployment.
 Existing publication does not authorize future commits, merges, pushes or deploys.
 Creating history or publishing requires the user's explicit authorization.
 
@@ -127,6 +150,9 @@ Creating history or publishing requires the user's explicit authorization.
 - The ledger checker passes after every ledger change.
 - Documentation links resolve and templates contain no unfilled placeholders.
 - Skills and agent definitions retain frontmatter with unique names per tool.
-- Application checks remain unavailable until the stack and commands are confirmed.
+- Run `python3 scripts/verify.py`: ledger, Docker builds, Ruff, unit tests,
+  real-MySQL integration, frontend checks, startup/outage/recovery/persistence smoke tests.
+- Check documentation links, workflow/skill frontmatter and Git ignore coverage.
+- No changed test assertions to make implementation pass.
 - Future UI changes require confirmed designs and verified screenshots.
 - Open points remain Q- entries; report failed or skipped checks with their reasons.

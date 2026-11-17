@@ -30,11 +30,13 @@ It is now published at https://github.com/Fleseriu-Stefan/p28-companywatch.
 Remote `origin` points to that repository; local `main` tracks `origin/main`.
 Follow AGENTS.md synchronization rules now that the remote and upstream exist.
 Explicit user authorization overrides automatic branch and commit steps in the original templates.
-Current permission covers the approved six-file documentation update and verification only.
+Current permission covers the explicitly approved M1 implementation, tests, CI
+workflow and technical documentation (user approval 2026-11-17).
 Existing publication does not authorize future commits, merges, pushes or deploys.
-No commit, merge, push, deploy or application implementation is authorized by this update.
+No commit, merge, push or deploy is authorized by the M1 implementation request.
 Team, ClickUp and Slack addons are disabled; their conditional template sections do not apply.
-Do not create tickets, PRs, workflows or external messages.
+Do not create tickets, PRs or external messages. The local M1 verification
+workflow under `.github/workflows/` is explicitly authorized; publishing is not.
 
 ## Design
 Keep local mocks, tokens and screenshots under docs/design/.
@@ -51,7 +53,9 @@ Q-004 blocks implementation until UI requirements and verification are confirmed
 ## Verification
 Run the ledger checker with --fix, then without --fix.
 Check frontmatter, local documentation paths and Git ignore rules.
-Application tests, builds and screenshots are unavailable until requirements and tooling exist.
+Run `python3 scripts/verify.py` for the approved M1 application checks in Docker.
+It uses an isolated MySQL volume and generated in-memory credentials. See README.md.
+Screenshots remain unavailable because visual UI requirements and tooling are unapproved.
 Report unavailable checks honestly; never substitute invented commands.
 
 ## Sources

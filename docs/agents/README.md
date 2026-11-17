@@ -37,8 +37,11 @@ pattern or contract, promote a candidate, or add a decision.
 <!-- graffino-agentic:end -->
 
 ## Initial setup and Codex CLI
-No application exists. D-001 requires Docker for application servers;
-D-002 requires Figma approval and versioned local design mocks.
+M1 includes infrastructure and a health API, with frontend build tooling only.
+D-001 requires Docker for application servers; D-002 requires Figma approval and
+versioned local design mocks. D-003–D-005 and C-001 define the approved M1 scope.
+See [../../README.md](../../README.md) for commands and
+[../CHECKPOINT.md](../CHECKPOINT.md) for missing professor deliverables.
 Team, ClickUp and Slack addons are disabled.
 The slash commands above describe Claude Code workflows.
 For Codex invocation, tool mapping and current restrictions, read [CODEX.md](CODEX.md).
