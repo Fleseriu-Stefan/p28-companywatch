@@ -44,3 +44,9 @@ node_modules/
 .docker/config.json
 .DS_Store
 Thumbs.db
+
+# Application build and verification output.
+frontend/dist/
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo

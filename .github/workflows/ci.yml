@@ -1,0 +1,20 @@
+name: M1 verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Ledger, Docker builds, tests and Compose smoke checks
+        run: python3 scripts/verify.py

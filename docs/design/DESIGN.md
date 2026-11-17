@@ -103,7 +103,7 @@ them; a ticket with UI has a design subtask instead (team addon).
 ## Source
 - Design board: none configured.
 - Figma: selected for design creation and visual approval (D-002); no file link or MCP integration configured.
-- Token source in code: none; no application code exists.
+- Token source in code: none; M1 has no visual UI or token values.
 
 ## Tokens
 No token values, font families, sizes or breakpoints have been selected.
@@ -130,7 +130,7 @@ Q-004 blocks UI implementation. Do not use sample token values as approved choic
 |---|---|---|
 
 ## Hard-coded values found (to migrate)
-None; no application code exists.
+None in visual component code; M1 has no visual components or styles.
 
 ## Codex CLI compatibility
 Codex follows D-002: create and visually approve designs in Figma, preserve the

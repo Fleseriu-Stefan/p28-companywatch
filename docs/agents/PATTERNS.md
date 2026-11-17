@@ -6,7 +6,14 @@
 <!-- graffino-agentic:end -->
 
 ## Index
+- PATTERN-001 · Isolated Compose verification · candidate
 
 ---
 
-No application patterns have been observed or approved.
+No application patterns are approved for replication.
+
+## PATTERN-001 · Isolated Compose verification
+- **Status:** candidate
+- **Date:** 2026-11-17
+- **How:** Exercise database and service lifecycle behaviours in a randomly named Compose project, with temporary credentials generated in memory, an ephemeral loopback port and project-scoped cleanup. Share the entry command between local verification and CI. Never target the development database for schema-negative tests.
+- **Example:** scripts/verify.py and .github/workflows/ci.yml establish this practice during approved M1 implementation. Candidate only; promotion requires user approval.
