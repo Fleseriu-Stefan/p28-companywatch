@@ -12,6 +12,9 @@
 - D-004 · Docker verification and continuous integration
 - D-005 · CompanyWatch requirements and dataset approval
 - D-002 · Figma approval with versioned local design mocks
+- D-006 · Approved ONRC development sources
+- D-007 · ONRC parsing, candidate identity and minimal legal-entity scope
+- D-008 · ETL version lifecycle, SQL diff and atomic publication
 
 ---
 
@@ -56,3 +59,27 @@
 - **Evidence:** User explicitly approved D-002 and the six-file documentation plan on 2026-11-06.
 - **Source:** user · confidence high
 - **Confirmed:** 2026-11-06
+
+## D-006 · Approved ONRC development sources
+- **Status:** approved
+- **Date:** 2026-11-17
+- **Rule:** The official OD_FIRME.CSV editions dated 19.10.2026 and 04.11.2026 are approved for M2 development. Preserve source/resource identifiers, URLs, CC BY 4.0 attribution, transfer metadata and SHA-256. Complete source validation remains mandatory before publication. This implementation session may use synthetic fixtures and bounded source investigation only, not full ONRC downloads.
+- **Why:** Two authentic editions were verified without claiming full-file integrity or complete quality.
+- **Evidence:** User explicitly approved D-006 and the M2 build with these conditions.
+- **Confirmed:** 2026-11-17
+
+## D-007 · ONRC parsing, candidate identity and minimal legal-entity scope
+- **Status:** approved
+- **Date:** 2026-11-17
+- **Rule:** Use UTF-8 with BOM, separator ^ and literal quote characters as the candidate ONRC profile, validating the full file before publication. EUID is a candidate natural key; missing keys and all rows participating in duplicate keys must not be published automatically. Persist only reliably identified legal entities and minimal identifiers, name, legal form, county, locality and registration date. Detailed addresses and natural-person records are not retained. Unknown classifications fail closed and are reported. Temporary protected local raw files are permitted only during processing, excluded from Git and public output, and removed after processing including failures.
+- **Why:** Sampling found malformed standard CSV quoting, duplicate/missing identifiers and natural-person records.
+- **Evidence:** User explicitly approved D-007 and the M2 scope/data-minimization conditions; classification evidence is documented in ../ONRC-SOURCE.md.
+- **Confirmed:** 2026-11-17
+
+## D-008 · ETL version lifecycle, SQL diff and atomic publication
+- **Status:** approved
+- **Date:** 2026-11-17
+- **Rule:** Implement streaming download and SHA-256, strict parsing, validation, staging, reconciled quality reports, idempotent immutable versions, explicit manual approval and transactional atomic publication in MySQL. Compare published versions in SQL using EUID and NULL-safe field comparisons. Preserve existing MySQL data. Initially test only with synthetic fixtures and isolated MySQL databases. Evolve schema-dependent M1 tests as explicitly authorized, preserving baseline history and verifying upgrade data preservation. No commit, push, merge or deploy is authorized.
+- **Why:** Incomplete or unapproved imports must not replace published data; M2 migrations supersede the test assumption that the database contains only the M1 baseline.
+- **Evidence:** User explicitly approved D-008, C-002 and the M2 implementation conditions, including evolution of M1 migration tests.
+- **Confirmed:** 2026-11-17

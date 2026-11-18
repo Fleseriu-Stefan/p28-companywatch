@@ -42,6 +42,9 @@ D-001 requires Docker for application servers; D-002 requires Figma approval and
 versioned local design mocks. D-003–D-005 and C-001 define the approved M1 scope.
 See [../../README.md](../../README.md) for commands and
 [../CHECKPOINT.md](../CHECKPOINT.md) for missing professor deliverables.
+M2 adds the ETL lifecycle and SQL diff under D-006–D-008/C-002, initially verified
+with synthetic data only. See [../M2-ETL.md](../M2-ETL.md) and
+[../M2-VERIFICATION.md](../M2-VERIFICATION.md). Full ONRC import is not yet authorized.
 Team, ClickUp and Slack addons are disabled.
 The slash commands above describe Claude Code workflows.
 For Codex invocation, tool mapping and current restrictions, read [CODEX.md](CODEX.md).

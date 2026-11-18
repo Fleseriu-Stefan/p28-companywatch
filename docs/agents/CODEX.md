@@ -30,10 +30,11 @@ It is now published at https://github.com/Fleseriu-Stefan/p28-companywatch.
 Remote `origin` points to that repository; local `main` tracks `origin/main`.
 Follow AGENTS.md synchronization rules now that the remote and upstream exist.
 Explicit user authorization overrides automatic branch and commit steps in the original templates.
-Current permission covers the explicitly approved M1 implementation, tests, CI
-workflow and technical documentation (user approval 2026-11-17).
+Current permission covers the approved M2 ETL implementation and verification with
+synthetic fixtures and isolated MySQL, including explicitly authorized migration
+test evolution. Full real downloads and changes to existing MySQL data are not authorized.
 Existing publication does not authorize future commits, merges, pushes or deploys.
-No commit, merge, push or deploy is authorized by the M1 implementation request.
+No commit, merge, push or deploy is authorized by the current M2 request.
 Team, ClickUp and Slack addons are disabled; their conditional template sections do not apply.
 Do not create tickets, PRs or external messages. The local M1 verification
 workflow under `.github/workflows/` is explicitly authorized; publishing is not.
@@ -53,7 +54,7 @@ Q-004 blocks implementation until UI requirements and verification are confirmed
 ## Verification
 Run the ledger checker with --fix, then without --fix.
 Check frontmatter, local documentation paths and Git ignore rules.
-Run `python3 scripts/verify.py` for the approved M1 application checks in Docker.
+Run `python3 scripts/verify.py` for the approved M1/M2 application checks in Docker.
 It uses an isolated MySQL volume and generated in-memory credentials. See README.md.
 Screenshots remain unavailable because visual UI requirements and tooling are unapproved.
 Report unavailable checks honestly; never substitute invented commands.

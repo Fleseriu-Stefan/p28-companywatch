@@ -5,7 +5,8 @@ WORKDIR /app
 COPY requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock \
     && useradd --uid 10001 --create-home app \
-    && chown app:app /app
+    && chown app:app /app \
+    && install -d -o app -g app -m 0700 /etl-private
 COPY --chown=app:app . .
 USER app
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

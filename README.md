@@ -2,11 +2,16 @@
 
 Proiect Tehnologii Web II: ETL + API + Dashboard. M1 implementează fundația
 tehnică: FastAPI, MySQL, migrări Alembic, Docker Compose, structură React cu
-TypeScript/Vite, teste și CI. Nu există încă ETL, date de domeniu sau dashboard.
+TypeScript/Vite, teste și CI. M2 adaugă pipeline ETL, snapshoturi minimale și diff
+SQL, verificate cu date sintetice. Nu s-au importat încă date reale și nu există dashboard.
 
-ONRC este doar o sursă candidată, neverificată. Interfața vizuală necesită
+Cele două ediții ONRC sunt aprobate pentru dezvoltare, cu validare integrală
+obligatorie înainte de publicare. Interfața vizuală necesită
 aprobarea unei versiuni Figma înainte de implementare. Lista separată a
 livrabilelor rămase este în [docs/CHECKPOINT.md](docs/CHECKPOINT.md).
+Ghidul M2, limitele și pașii pentru un import real viitor sunt în
+[docs/M2-ETL.md](docs/M2-ETL.md); sursele și filtrul persoanelor juridice sunt în
+[docs/ONRC-SOURCE.md](docs/ONRC-SOURCE.md).
 
 ## Cerințe de instalare
 
@@ -57,29 +62,31 @@ automat parolele salvate de MySQL.
 
 ## Build și pornire
 
-Cu parolele din `.env` privat sau cu variabilele exportate în terminal:
+Cu parolele din `.env` privat sau cu variabilele exportate în terminal, folosește
+proiectul M2 separat. Portul 8001 din exemplu permite rularea alături de M1.
 
 ```bash
-docker compose build api frontend
-docker compose up -d --wait --wait-timeout 180 api
-docker compose ps -a
+docker compose -p companywatch-m2 build api frontend
+API_PORT=8001 COMPANYWATCH_M2_MIGRATE=1 docker compose -p companywatch-m2 up -d --wait --wait-timeout 180 api
+docker compose -p companywatch-m2 ps -a
 ```
 
 Ordinea este `db` sănătos → `migrate` terminat cu succes → `api` disponibil.
-Prima pornire creează baza și volumul persistent. Migrarea inițială creează doar
-evidența Alembic; nu există tabele de companii sau schema presupusă a unui dataset.
-MySQL nu are port publicat pe host. API-ul ascultă numai pe loopback, implicit pe
-portul 8000; `API_PORT` din `.env` poate selecta un alt port local.
+Proiectul `companywatch-m2` are propriul volum persistent, `companywatch-m2_mysql_data`.
+Volumul `companywatch_mysql_data` aparține proiectului M1 `companywatch`.
+Serviciul de migrare cere `COMPANYWATCH_M2_MIGRATE=1` și refuză proiectul M1.
+MySQL folosește rețeaua internă Compose. API-ul ascultă pe loopback cu portul
+configurat prin `API_PORT`.
 
 ```bash
-curl --fail http://127.0.0.1:8000/health/live
-curl --fail http://127.0.0.1:8000/health/ready
+curl --fail http://127.0.0.1:8001/health/live
+curl --fail http://127.0.0.1:8001/health/ready
 ```
 
 Contractul endpointurilor este definit în
 [C-001](docs/agents/CONTRACTS.md#c-001--health-and-api-documentation).
-Documentația interactivă este la [localhost:8000/docs](http://127.0.0.1:8000/docs),
-iar OpenAPI la [localhost:8000/openapi.json](http://127.0.0.1:8000/openapi.json).
+Documentația interactivă este la [localhost:8001/docs](http://127.0.0.1:8001/docs),
+iar OpenAPI la [localhost:8001/openapi.json](http://127.0.0.1:8001/openapi.json).
 Acestea sunt documentația tehnică FastAPI; dashboard-ul nu este implementat.
 
 ## Frontend fără interfață vizuală
@@ -96,8 +103,8 @@ din acest container temporar nu sunt publicate sau exportate pe host.
 ## Migrări
 
 ```bash
-docker compose run --rm migrate
-docker compose run --rm --no-deps tests alembic current
+COMPANYWATCH_M2_MIGRATE=1 docker compose -p companywatch-m2 run --rm migrate
+docker compose -p companywatch-m2 run --rm --no-deps tests alembic current
 ```
 
 Migrările nu rulează în fiecare worker API. Serviciul `migrate` este responsabil
@@ -117,13 +124,16 @@ python3 scripts/verify.py
 ```
 
 Nu necesită parolele tale: scriptul generează credențiale temporare în memorie,
-folosește un proiect Compose cu nume aleator și port API dinamic, apoi șterge doar
-containerele, rețeaua și volumul acelui proiect în blocul de cleanup. Nu utilizează
-baza de dezvoltare. Imaginile și cache-ul de build rămân disponibile local.
+folosește un proiect Compose cu nume aleator și port API dinamic. Verifică
+numele proiectului, volumul și mount-ul MySQL înainte de testele cu baza de date.
+La final curăță resursele proiectului verificat și tagurile de imagini generate
+pentru rulare. Cache-ul de build rămâne disponibil local.
 
-Verificările includ ledger, Docker build, Ruff, teste API/configurare, MySQL real,
+Verificările includ ledger, Docker build, Ruff, teste API/configurare/ETL, MySQL real,
 migrări repetate, schemă incompatibilă, oprire/revenire DB, persistență după
-recrearea containerelor și blocarea API la eșecul migrării. Eșecul cu codul 17 din
+recrearea containerelor și blocarea API la eșecul migrării. Sunt incluse verificarea
+istorică `0001_baseline`, upgrade-ul M2 fără pierdere de date și 100.001 rânduri
+sintetice, fără rețea ONRC în teste. Eșecul cu codul 17 din
 scenariul de migrare este injectat intenționat și trebuie urmat de recuperare.
 
 Verificări individuale, pe configurația locală:
@@ -149,10 +159,10 @@ executat pe GitHub.
 ## Oprire și diagnostic
 
 ```bash
-docker compose logs --tail 100 api migrate
-docker compose stop
-docker compose up -d --wait --wait-timeout 180 api
-docker compose down
+docker compose -p companywatch-m2 logs --tail 100 api migrate
+docker compose -p companywatch-m2 stop
+API_PORT=8001 COMPANYWATCH_M2_MIGRATE=1 docker compose -p companywatch-m2 up -d --wait --wait-timeout 180 api
+docker compose -p companywatch-m2 down
 ```
 
 Oprirea și `down` păstrează volumul MySQL. Nu adăuga opțiunea de eliminare a
@@ -178,4 +188,4 @@ a reporni API-ul; nu modifica manual revizia ca să maschezi eroarea.
 | `docs/design/` | Reguli și viitoare designuri aprobate |
 | `docs/CHECKPOINT.md` | Livrabilele încă lipsă |
 
-Nu s-a autorizat commit, merge, push sau deploy prin implementarea M1.
+Nu s-a autorizat commit, merge, push sau deploy prin cererea curentă M2.

@@ -1,10 +1,10 @@
 from alembic import context
-from sqlalchemy import MetaData
 
 from app.config import Settings
 from app.db import create_database_engine
+from app.etl.models import metadata
 
-target_metadata = MetaData()
+target_metadata = metadata
 
 
 def run_migrations() -> None:
