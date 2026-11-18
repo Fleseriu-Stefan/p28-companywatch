@@ -3,7 +3,8 @@ from threading import Event
 from time import monotonic, sleep
 
 import pytest
-from sqlalchemy import func, select, text, update
+from sqlalchemy import event, func, select, text, update
+from sqlalchemy.exc import OperationalError
 
 from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
@@ -105,6 +106,58 @@ def test_failed_file_never_replaces_current_snapshot(pipeline, tmp_path):
             )
             >= 1
         )
+
+
+def test_sql_failure_after_staging_keeps_current_publication(pipeline, tmp_path, caplog):
+    current_path = csv_file(tmp_path / "current.csv", [row(8501)])
+    current = pipeline.ingest(current_path, source())
+    current_approval = publish(pipeline, current)
+    path = csv_file(tmp_path / "failed.csv", [row(8502, DENUMIRE="SYNTHETIC_PRIVATE_VALUE")])
+
+    def fail_aggregation(*args):
+        statement = args[2]
+        if "GROUP BY etl_staging_rows.legal_form" in statement:
+            raise OperationalError(
+                "SYNTHETIC_PRIVATE_SQL",
+                {"data": "SYNTHETIC_PRIVATE_PARAMETER"},
+                RuntimeError(1205, "SYNTHETIC_PRIVATE_DRIVER_MESSAGE"),
+            )
+
+    event.listen(pipeline.engine, "before_cursor_execute", fail_aggregation)
+    try:
+        with pytest.raises(ETLError, match="^database_error$"):
+            pipeline.ingest(path, source())
+    finally:
+        event.remove(pipeline.engine, "before_cursor_execute", fail_aggregation)
+
+    assert "operation=count_accepted_forms outcome=sql_operation_failed" in caplog.text
+    assert "driver_code=1205" in caplog.text
+    assert "SYNTHETIC_PRIVATE" not in caplog.text
+    with pipeline.engine.connect() as connection:
+        failed = connection.execute(
+            select(versions.c.id).where(versions.c.sha256 == file_hash(path))
+        ).scalar_one()
+        assert not connection.scalar(
+            select(func.count()).select_from(staging).where(staging.c.version_id == failed)
+        )
+        assert not connection.scalar(
+            select(func.count()).select_from(companies).where(companies.c.version_id == failed)
+        )
+        assert connection.scalar(select(publications.c.current_version_id)) == current
+        assert (
+            connection.scalar(select(versions.c.approval).where(versions.c.id == current))
+            == current_approval
+        )
+    failed_report = pipeline.report(failed)
+    assert failed_report["state"] == "failed"
+    assert failed_report["report"]["full_file_validated"] is False
+    assert failed_report["report"]["failure_code"] == "database_error"
+    with pytest.raises(ETLError, match="^version_not_reviewable$"):
+        pipeline.approve(failed, failed_report["report_hash"])
+    with pytest.raises(ETLError, match="^approval_required$"):
+        pipeline.publish(failed, current_approval)
+    with pipeline.engine.connect() as connection:
+        assert connection.scalar(select(publications.c.current_version_id)) == current
 
 
 @pytest.mark.parametrize("late_failure", [False, True])
