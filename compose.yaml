@@ -1,7 +1,7 @@
-name: companywatch
+name: companywatch-m2
 
 x-backend: &backend
-  image: companywatch-backend:m1
+  image: ${COMPOSE_PROJECT_NAME:-companywatch-m2}-backend:m2
   build:
     context: ./backend
   environment: &database-environment
@@ -30,7 +30,25 @@ services:
 
   migrate:
     <<: *backend
-    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *database-environment
+      M2_MIGRATION_PROJECT: ${COMPOSE_PROJECT_NAME:-}
+      COMPANYWATCH_M2_MIGRATE: ${COMPANYWATCH_M2_MIGRATE:-0}
+    command:
+      - sh
+      - -ec
+      - |
+        case "$$M2_MIGRATION_PROJECT" in
+          ""|companywatch)
+            echo "M2 migration requires a separate Compose project"
+            exit 2
+            ;;
+        esac
+        if [ "$$COMPANYWATCH_M2_MIGRATE" != 1 ]; then
+          echo "Set COMPANYWATCH_M2_MIGRATE=1 to migrate this M2 project"
+          exit 2
+        fi
+        exec alembic upgrade head
     depends_on:
       db:
         condition: service_healthy
@@ -52,15 +70,23 @@ services:
   tests:
     <<: *backend
     profiles: ["tools"]
+    environment:
+      <<: *database-environment
+      ETL_TEST_PROJECT: ${COMPOSE_PROJECT_NAME:-}
     command: ["pytest", "-q"]
     volumes:
       - ./scripts:/checks:ro
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+
+  etl:
+    <<: *backend
+    profiles: ["tools"]
+    entrypoint: ["python", "-m", "app.etl.cli"]
+    command: ["--help"]
+    tmpfs:
+      - /etl-private:rw,noexec,nosuid,nodev,mode=0700,uid=10001,gid=10001,size=1073741824
 
   frontend:
-    image: companywatch-frontend:m1
+    image: ${COMPOSE_PROJECT_NAME:-companywatch-m2}-frontend:m1
     build:
       context: ./frontend
     profiles: ["tools"]

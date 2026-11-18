@@ -16,6 +16,7 @@
 - Q-005 · Which public dataset and real versions can be approved? · _investigating_
 - Q-006 · What interview evidence and checkpoint rubric must be delivered?
 - Q-007 · Where and how should the public deployment run?
+- Q-008 · Can the verified legal-entity subset be extended?
 
 ---
 
@@ -44,9 +45,9 @@
 
 ## Q-005 · Which public dataset and real versions can be approved?
 - **Status:** investigating
-- **Blocks:** Dataset selection, domain schema, ETL, quality rules and SQL diff; does not block approved M1 infrastructure.
+- **Blocks:** Publication of real ONRC data until full-file validation; does not block the approved synthetic M2 build.
 - **Who answers:** Project owner, after source investigation.
-- **Partial answer:** User explicitly designated ONRC as a candidate only. Public source URLs, licensing, schema, row counts, two authentic versions and a usable identity key remain unverified. No dataset assertions are approved.
+- **Partial answer:** User approved the two verified OD_FIRME.CSV editions (19.10.2026 and 04.11.2026) for M2 development, the candidate EUID key, minimal legal-entity fields and temporary protected raw processing. D-006–D-008 and C-002 govern implementation. Full downloads and mutation of existing development data remain unauthorized. Complete row counts, global quality and at least 100,000 accepted legal-entity rows per edition must be measured before manual publication. See ../ONRC-SOURCE.md.
 
 ## Q-006 · What interview evidence and checkpoint rubric must be delivered?
 - **Status:** open
@@ -59,3 +60,9 @@
 - **Blocks:** Public URL, hosting, production configuration and deployment.
 - **Who answers:** Project owner.
 - **Partial answer:** On 2026-11-17 the user requested documentation of the missing public URL deployment and explicitly withheld deployment authorization. No provider or public URL is confirmed. See ../CHECKPOINT.md.
+
+## Q-008 · Can the verified legal-entity subset be extended?
+- **Status:** open
+- **Blocks:** Expansion beyond the verified J + SRL/SA/SNC subset, not the approved M2 implementation.
+- **Who answers:** Project owner after evidence of source coding.
+- **Proposed answer:** Keep unknown forms and branches quarantined. Verify additional legal-form mappings before extending the profile; never infer a legal category only from initials. See ../ONRC-SOURCE.md.

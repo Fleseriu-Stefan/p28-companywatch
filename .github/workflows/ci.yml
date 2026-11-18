@@ -1,4 +1,4 @@
-name: M1 verification
+name: M1/M2 verification
 
 on:
   pull_request:

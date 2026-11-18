@@ -60,6 +60,9 @@ without new evidence. A rejected proposal is added there with the reason.
   User-authorized local exception: MySQL passwords may be generated once and kept
   in the untracked, Git-ignored `.env` with mode `600`. Never print or commit them;
   preserve existing database credentials and data.
+  User-authorized M2 exception: real ONRC raw files may exist only temporarily in
+  the protected ETL tmpfs, never in Git/logs/public artifacts. Persist only the
+  minimal verified legal-entity projection (D-007); remove raw data after processing.
 - Never push, tag, release, or deploy without the user's go for that action.
 - When you cite past work, label the intent: **replicate** (only for an `approved`
   pattern) or **for awareness only**. History is not a template.
@@ -84,9 +87,10 @@ without new evidence. A rejected proposal is added there with the reason.
 
 ## 1. What this repo is
 p28-companywatch is a Tehnologii Web II ETL + API + Dashboard project.
-M1 contains Docker infrastructure, health API, migration baseline and frontend
-tooling without visual UI. Domain data, ETL and dashboard remain unimplemented.
-See D-005 and `docs/CHECKPOINT.md`; ONRC is a candidate only.
+M1 provides Docker infrastructure, health API and frontend tooling without visual UI.
+M2 implements the ETL lifecycle, minimal legal-entity snapshots and SQL diff, tested
+only on synthetic data. Two ONRC development sources are approved (D-006), but no
+full real import or real publication has occurred. See `docs/CHECKPOINT.md`.
 
 ## 2. Stack and commands
 Approved stack: React + TypeScript + Vite, FastAPI, MySQL, SQLAlchemy, PyMySQL,
@@ -99,7 +103,7 @@ python3 docs/agents/tools/ledger-lint.py --fix
 python3 docs/agents/tools/ledger-lint.py
 python3 scripts/verify.py
 docker compose build api frontend
-docker compose up -d --wait --wait-timeout 180 api
+API_PORT=8001 COMPANYWATCH_M2_MIGRATE=1 docker compose -p companywatch-m2 up -d --wait --wait-timeout 180 api
 docker compose run --rm --no-deps tests ruff check .
 docker compose run --rm --no-deps tests ruff format --check .
 docker compose run --rm --no-deps tests pytest -q -m 'not integration'
@@ -108,8 +112,13 @@ docker compose run --rm --no-deps frontend
 
 `scripts/verify.py` runs real-MySQL integration tests and Compose smoke checks in
 an isolated project; never run the integration suite on the development database.
+The legacy `companywatch` project owns `companywatch_mysql_data`. Run M2 on a
+separately named project and volume. The migration service requires an explicit
+opt-in and refuses the legacy project.
 Frontend command runs ESLint, TypeScript and Vite build. No UI or screenshot
-tooling is approved yet. Verification results: `docs/M1-VERIFICATION.md`.
+tooling is approved yet. Verification results: `docs/M1-VERIFICATION.md` and
+`docs/M2-VERIFICATION.md`. `docker compose run --rm --no-deps etl sources` lists
+the approved resources without downloading them. See `docs/M2-ETL.md` for the CLI.
 
 ## 3. Layout
 - `backend/`: FastAPI, database connectivity, Alembic and tests.
@@ -129,7 +138,10 @@ tooling is approved yet. Verification results: `docs/M1-VERIFICATION.md`.
 - Read D-001 before planning or implementing application servers.
 - Follow D-002 and `docs/design/DESIGN.md` for Figma approval and versioned local mocks.
 - M1 implementation and D-003–D-005/C-001 were explicitly approved on 2026-11-17.
-- Dataset-dependent work and UI implementation remain blocked by Q-005 and Q-004.
+- M2 synthetic implementation, D-006–D-008/C-002 and evolution of M1 migration
+  tests were explicitly approved. Existing MySQL data must remain untouched in
+  this build; no full ONRC download is authorized yet.
+- Full real validation/publication remains Q-005; UI implementation remains Q-004.
 - This setup authorizes no commit, merge, GitHub repository creation or push.
 - Explicit user restrictions override commit instructions in the workflow templates.
 - Team, ClickUp and Slack addons are disabled by user choice.
@@ -154,5 +166,7 @@ Creating history or publishing requires the user's explicit authorization.
   real-MySQL integration, frontend checks, startup/outage/recovery/persistence smoke tests.
 - Check documentation links, workflow/skill frontmatter and Git ignore coverage.
 - No changed test assertions to make implementation pass.
+- Explicit M2 authorization permits replacing M1-only head expectations with M2
+  expectations while preserving historical baseline assertions and upgrade data checks.
 - Future UI changes require confirmed designs and verified screenshots.
 - Open points remain Q- entries; report failed or skipped checks with their reasons.

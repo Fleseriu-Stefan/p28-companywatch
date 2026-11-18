@@ -11,5 +11,10 @@ _Avoid_: none specified.
 **Knowledge ledger** (noun) — The decisions, patterns, contracts and open questions under `docs/agents/`.
 _Avoid_: none specified.
 
-The confirmed project purpose is ETL + API + Dashboard (D-005). No dataset-specific
-domain vocabulary or user roles have been confirmed; see docs/agents/OPEN-QUESTIONS.md, Q-001.
+**EUID** (noun) — The ONRC source identifier used as a candidate natural key for
+M2. Missing, inconsistent or duplicate identifiers are quarantined under D-007.
+_Avoid_: treating CUI as an interchangeable identity key.
+
+The confirmed project purpose is ETL + API + Dashboard (D-005). M2 confirms the
+minimal legal-entity scope and version lifecycle in D-007/D-008 and C-002.
+User roles and broader domain behaviour remain open in docs/agents/OPEN-QUESTIONS.md, Q-001.
