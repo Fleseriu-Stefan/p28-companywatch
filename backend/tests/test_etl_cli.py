@@ -1,7 +1,11 @@
+import json
 from unittest.mock import patch
+
+import pytest
 
 from app.etl.cli import main
 from app.etl.errors import ETLError
+from app.etl.service import quality_deltas
 
 
 def test_real_download_needs_explicit_consent_before_database_or_network(capsys):
@@ -22,3 +26,59 @@ def test_real_import_refuses_persistent_raw_storage(capsys):
         with patch("app.etl.cli.downloaded", side_effect=AssertionError("No network allowed")):
             assert main(["ingest", "--edition", "2026-10-19", "--allow-real-download"]) == 2
     assert "raw_tmpfs_required" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("previous", "current", "duplicates", "expected"),
+    [
+        (100, 61, 0, []),
+        (100, 60, 0, ["accepted_records_decreased_at_least_40_percent"]),
+        (100, 59, 0, ["accepted_records_decreased_at_least_40_percent"]),
+        (100, 0, 0, ["accepted_records_dropped_to_zero"]),
+        (0, 0, 0, []),
+        (0, 1, 0, []),
+        (
+            100,
+            60,
+            2,
+            ["duplicate_records_appeared", "accepted_records_decreased_at_least_40_percent"],
+        ),
+    ],
+)
+def test_quality_advisories_and_rate_denominators(previous, current, duplicates, expected):
+    def report(accepted, duplicate_rows):
+        total = accepted + duplicate_rows
+        return {
+            "source_records": total,
+            "accepted_records": accepted,
+            "excluded_records": 0,
+            "quarantined_records": duplicate_rows,
+            "duplicate_key_records": duplicate_rows,
+            "source_legal_forms": {"SRL": total},
+            "accepted_legal_forms": {"SRL": accepted},
+        }
+
+    result = quality_deltas(report(previous, 0), report(current, duplicates))
+    assert result["advisories"] == expected
+    assert result["counts"]["accepted_records"]["delta"] == current - previous
+    rate = result["rates"]["accepted_records"]
+    assert rate["old_denominator"] == previous
+    assert rate["new_denominator"] == current + duplicates
+    if not previous or current + duplicates == 0:
+        assert rate["delta_pp"] is None
+    else:
+        assert rate["delta_pp"] == pytest.approx(100 * (current / (current + duplicates) - 1))
+
+
+def test_quality_cli_uses_explicit_ids(capsys):
+    result = {"old_version": "old", "new_version": "new", "advisories": []}
+    with (
+        patch("app.etl.cli.Settings.from_env"),
+        patch("app.etl.cli.create_database_engine") as engine,
+        patch("app.etl.cli.Pipeline") as pipeline,
+    ):
+        pipeline.return_value.quality_compare.return_value = result
+        assert main(["quality-compare", "old", "new"]) == 0
+        pipeline.return_value.quality_compare.assert_called_once_with("old", "new")
+        engine.return_value.dispose.assert_called_once_with()
+    assert json.loads(capsys.readouterr().out) == result

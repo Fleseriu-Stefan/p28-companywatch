@@ -1,20 +1,21 @@
 # M2 — implementare și verificare
 
-Finalizare verificări: 2026-11-18. Ramură locală: `feat/m2-etl`, creată din main
-actualizat. Implementarea urmează aprobarea D-006, D-007, D-008 și C-002 și cele
-zece condiții furnizate de utilizator. Nu s-au făcut commit, push, merge sau deploy.
+Verificările locale au fost finalizate la 2026-11-18 pe `feat/m2-etl`.
+M2 a fost integrat în `main` prin
+[PR #2](https://github.com/Fleseriu-Stefan/p28-companywatch/pull/2), la
+`b8a2b6f4e67ad50d6a9d3087c01f76820a50786b`.
+GitHub Actions a trecut pe [PR](https://github.com/Fleseriu-Stefan/p28-companywatch/actions/runs/44303506687)
+și pe [commitul din main](https://github.com/Fleseriu-Stefan/p28-companywatch/actions/runs/44305433658).
 
-## Ultima rulare completă reușită
+## Rularea locală completă M2
 
 Comanda `python3 -B scripts/verify.py` a ieșit cu codul **0** și mesajul
-`M1/M2 verification passed`, după remedierea problemelor de concurență și migrare.
-Rularea a precedat ultima actualizare a regulilor `.dockerignore`. Pentru acea
-actualizare au fost executate verificări statice. O nouă rulare completă în Docker
-necesită aprobarea utilizatorului.
+`M1/M2 verification passed`, după remedierea problemelor de concurență și migrare
+și după actualizarea finală a regulilor `.dockerignore`.
 
 | Verificare | Rezultat |
 |---|---|
-| Ledger lint și excluderi Git | Trecute |
+| Ledger lint și excluderi Git și Docker | Trecute |
 | Docker build backend/frontend | Trecut |
 | Ruff check și format, backend/script | Trecut |
 | Teste unitare API/configurare/ETL | `30 passed, 16 deselected` |
@@ -37,8 +38,8 @@ neaprobate, diff SQL NULL-safe și sensibil la litere, rollback atomic și recup
 versiunii abandonate. Snapshoturile sintetice sunt marcate distinct; CLI nu le
 poate publica și nu poate coborî pragul pentru date reale.
 
-Runnerul a verificat proiectul temporar `companywatch-check-4dca21d2c05de377`
-și volumul separat `companywatch-check-4dca21d2c05de377_mysql_data` înainte de
+Runnerul a verificat proiectul temporar `companywatch-check-5d717f1c7bf1de63`
+și volumul separat `companywatch-check-5d717f1c7bf1de63_mysql_data` înainte de
 migrări și teste de integrare. Credenițialele de test au fost generate în memorie.
 Containerele, rețeaua și volumul de test au fost eliminate după verificare.
 Testele ETL au folosit date sintetice și simulări de transfer.
@@ -81,7 +82,6 @@ injectat a confirmat blocarea API-ului până la o migrare reușită.
 
 - Rămân avertismentul Starlette/HTTPX privind TestClient și notificarea npm
   despre o versiune majoră disponibilă.
-- CI M2 pe GitHub nu a rulat: ramura nu este publicată în această sesiune.
 - Full-file ONRC, calitatea globală, minimum 100.000 PJ eligibile per ediție și
   diff-ul real nu au fost demonstrate. Nu există rezultate inventate.
 - tmpfs-ul de 1 GiB și spațiul MySQL trebuie dimensionate înaintea importului real.

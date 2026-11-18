@@ -27,23 +27,70 @@ Q-004 blocks visual UI; Q-005 blocks publication until complete real validation.
 | Design documentation | docs/design/ | Guardrails and future design records | No visual UI yet |
 | Claude workflows | .claude/ | Original plan/build skills and agents | Knowledge ledger |
 
-## Data flow
-`db` healthy → `migrate` exits successfully → `api` starts. API readiness queries
-MySQL and compares its Alembic revision with the application's heads. Liveness
-does not access MySQL. Contract details live only in CONTRACTS.md, C-001.
-ETL produces immutable prepared snapshots. Only an approved complete version can
-become current through a locked InnoDB pointer update. SQL diff compares two
-published version IDs; it never labels a disappearance as legal deregistration.
-No real company data has been imported, and no dashboard exists yet.
+## M1 runtime and M2 components
+
+```mermaid
+flowchart LR
+    Client["Local API client"] --> API["FastAPI · health and OpenAPI"]
+    subgraph Compose["M2 Compose project"]
+        API -->|"readiness"| DB["MySQL · project volume"]
+        DB -->|"healthy"| Migrate["Alembic · explicit opt-in"]
+        Migrate -->|"successful exit"| API
+        ETL["ETL CLI"] --> DB
+        Frontend["React · TypeScript · Vite build"]
+    end
+    Source["Approved ONRC edition"] -->|"authorized ingest only"| ETL
+    Legacy["M1 project · companywatch_mysql_data"]
+    Checks["Verification runner"] --> Isolated["Disposable Compose project · test volume"]
+```
+
+M1 established the Docker startup order and the FastAPI health routes. Liveness
+checks the API process. Readiness queries MySQL and compares the current Alembic
+revision with the application's heads. The original M1 revision is
+`0001_baseline`; an initialized M2 database uses `0002_etl`. The React entry
+point renders no dashboard and does not consume the API.
+[Health contract C-001](CONTRACTS.md#c-001--health-and-api-documentation)
+
+## M2 ingest and publication
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant CLI as ETL CLI
+    participant Raw as Protected tmpfs
+    participant DB as MySQL
+    Operator->>CLI: Ingest approved edition with explicit download consent
+    CLI->>Raw: Stream bytes and compute SHA-256
+    CLI->>DB: Validate and stage minimal rows under the ingest lock
+    CLI->>DB: Prepare immutable snapshot and sealed quality report
+    CLI->>Raw: Remove temporary input
+    Operator->>CLI: Review and approve report hash
+    CLI->>DB: Store approval seal
+    Operator->>CLI: Publish with approval seal
+    CLI->>DB: Update pointer and version state in one transaction
+    Operator->>CLI: Diff two published version IDs
+    CLI->>DB: Compare EUID matches and retained fields in SQL
+```
+
+The publication pointer selects the current snapshot; version IDs allow explicit
+historical comparisons. A disappearance is relative to the compared exports.
+Real company data has yet to be imported.
+[ETL contract C-002](CONTRACTS.md#c-002--etl-snapshots-and-publication-boundary)
 
 ## State and storage
-M2 adds etl_versions (manifest/report/seals), etl_attempts, etl_staging_rows,
-company_version_rows and dataset_publications; baseline M1 remains in migration history.
-The M1 database uses `companywatch_mysql_data` in project `companywatch`. The
-M2 Compose configuration defaults to `companywatch-m2` with its own volume.
-Migration requires explicit opt-in and refuses the M1 project. The verification
-runner checks its generated project and actual MySQL mount before database tests
-and verifies ownership before cleanup.
+
+| Store | Purpose |
+|---|---|
+| `etl_versions` and `etl_attempts` | Source identity, lineage, state, quality report, seals and attempt history |
+| `etl_staging_rows` | Temporary batches for validation and duplicate detection |
+| `company_version_rows` | The eight retained fields in versioned legal-entity snapshots |
+| `dataset_publications` | Current snapshot pointer |
+
+The original M1 database uses `companywatch_mysql_data` in project
+`companywatch`. The M2 default project uses `companywatch-m2_mysql_data`.
+The migration service requires explicit opt-in and rejects the M1 project.
+Verification uses a third, disposable project and checks the live MySQL mount
+before integration tests and ownership before cleanup.
 
 ## Configuration
 Non-secret defaults live in `.env.example`. The user explicitly authorized local

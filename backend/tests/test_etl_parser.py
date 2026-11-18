@@ -62,3 +62,34 @@ def test_wrong_record_width_is_a_file_error(tmp_path):
         handle.write("synthetic^incomplete\n")
     with pytest.raises(ETLError, match="record_width_invalid"):
         list(records(path))
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        (*HEADER, "UNREVIEWED"),
+        HEADER[1:],
+        ("RENAMED", *HEADER[1:]),
+        (HEADER[1], HEADER[0], *HEADER[2:]),
+        (HEADER[1], *HEADER[1:]),
+    ],
+    ids=["added", "removed", "renamed", "reordered", "duplicate"],
+)
+def test_header_drift_fails_closed(tmp_path, header):
+    with pytest.raises(ETLError, match="^schema_changed$"):
+        list(records(csv_file(tmp_path / "drift.csv", [row()], header)))
+
+
+@pytest.mark.parametrize(
+    ("encoding", "separator", "error"),
+    [
+        ("utf-8", "^", "encoding_bom_missing"),
+        ("utf-16", "^", "encoding_bom_missing"),
+        ("utf-8-sig", ";", "schema_changed"),
+    ],
+)
+def test_encoding_and_delimiter_drift_fail_closed(tmp_path, encoding, separator, error):
+    path = tmp_path / "dialect.csv"
+    path.write_text(separator.join(HEADER) + "\n", encoding=encoding)
+    with pytest.raises(ETLError, match=f"^{error}$"):
+        list(records(path))

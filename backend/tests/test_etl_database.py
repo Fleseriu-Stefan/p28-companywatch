@@ -8,6 +8,7 @@ from sqlalchemy import func, select, text, update
 from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
 from app.etl.service import PROFILE_VERSION, Pipeline, digest_json, file_hash
+from app.etl.source import HEADER
 from tests.etl_fixtures import csv_file, row, source
 
 pytestmark = pytest.mark.integration
@@ -104,6 +105,143 @@ def test_failed_file_never_replaces_current_snapshot(pipeline, tmp_path):
             )
             >= 1
         )
+
+
+@pytest.mark.parametrize("late_failure", [False, True])
+def test_schema_drift_leaves_no_publishable_snapshot(pipeline, tmp_path, late_failure):
+    baseline_path = csv_file(tmp_path / "baseline.csv", [row(8100 + late_failure)])
+    baseline = pipeline.ingest(baseline_path, source())
+    publish(pipeline, baseline)
+    sentinel = "SYNTHETIC_PRIVATE_DRIFT_VALUE"
+    path = tmp_path / "drift.csv"
+    if late_failure:
+        csv_file(path, (row(number) for number in range(1, 1001)))
+        with path.open("a") as handle:
+            handle.write(f"{sentinel}^incomplete\n")
+        error = "record_width_invalid"
+    else:
+        csv_file(path, [row()], (sentinel, *HEADER[1:]))
+        error = "schema_changed"
+    artifact_hash = file_hash(path)
+    with pytest.raises(ETLError, match=f"^{error}$"):
+        pipeline.ingest(path, source("2026-11-04"))
+    with pipeline.engine.connect() as connection:
+        version = connection.execute(
+            select(versions.c.id).where(
+                versions.c.sha256 == artifact_hash, versions.c.source_kind == "synthetic"
+            )
+        ).scalar_one()
+        assert not connection.scalar(
+            select(func.count()).select_from(staging).where(staging.c.version_id == version)
+        )
+        assert not connection.scalar(
+            select(func.count()).select_from(companies).where(companies.c.version_id == version)
+        )
+        assert connection.scalar(select(publications.c.current_version_id)) == baseline
+    manifest = pipeline.report(version)
+    assert manifest["state"] == "failed"
+    assert manifest["report"]["full_file_validated"] is False
+    assert manifest["report"]["failure_code"] == error
+    assert manifest["report"]["source_records"] == (1000 if late_failure else 0)
+    assert sentinel not in str(manifest)
+    with pytest.raises(ETLError, match="^version_not_reviewable$"):
+        pipeline.approve(version, manifest["report_hash"])
+    with pytest.raises(ETLError, match="^approval_required$"):
+        pipeline.publish(version, manifest["report_hash"])
+
+
+def test_quality_distributions_and_comparison_preserve_seals(pipeline, tmp_path):
+    sentinel = "SYNTHETIC_PRIVATE_FORM"
+    old_rows = [row(number) for number in range(8201, 8206)]
+    new_rows = [
+        row(8201),
+        row(8202, FORMA_JURIDICA="SA"),
+        row(8203, FORMA_JURIDICA="SNC"),
+        row(8204),
+        row(8204),
+        row(8205, FORMA_JURIDICA=""),
+        row(8206, FORMA_JURIDICA=sentinel),
+        row(8207, COD_INMATRICULARE="F01/8207/2020", FORMA_JURIDICA="PFA"),
+    ]
+    old = pipeline.ingest(csv_file(tmp_path / "old.csv", old_rows), source())
+    publish(pipeline, old)
+    new_path = csv_file(tmp_path / "new.csv", new_rows)
+    new_source = source("2026-11-04")
+    new = pipeline.ingest(new_path, new_source)
+    old_before = pipeline.report(old)
+    new_before = pipeline.report(new)
+    report = new_before["report"]
+    assert report["source_legal_forms"] == {"SRL": 3, "SA": 1, "SNC": 1, "missing": 1, "other": 2}
+    assert report["accepted_legal_forms"] == {"SRL": 1, "SA": 1, "SNC": 1}
+    assert sum(report["source_legal_forms"].values()) == report["source_records"]
+    assert sum(report["accepted_legal_forms"].values()) == report["accepted_records"]
+    assert new_before["report_hash"] == digest_json(report)
+    assert sentinel not in str(new_before)
+    result = pipeline.quality_compare(old, new)
+    assert result["comparison_status"] == "comparable"
+    assert result["counts"]["accepted_records"] == {"old": 5, "new": 3, "delta": -2}
+    assert result["rates"]["accepted_records"]["delta_pp"] == pytest.approx(-62.5)
+    assert result["distributions"]["accepted_legal_forms"]["SA"]["count"]["delta"] == 1
+    assert result["advisories"] == [
+        "duplicate_records_appeared",
+        "accepted_records_decreased_at_least_40_percent",
+    ]
+    assert sentinel not in str(result)
+    with pytest.raises(ETLError, match="^synthetic_not_allowed$"):
+        Pipeline(pipeline.engine).quality_compare(old, new)
+    assert pipeline.ingest(new_path, new_source) == new
+    assert pipeline.report(old) == old_before
+    assert pipeline.report(new) == new_before
+    with pipeline.engine.connect() as connection:
+        assert connection.scalar(select(publications.c.current_version_id)) == old
+        assert connection.scalar(select(versions.c.approval).where(versions.c.id == new)) is None
+    assert pipeline.approve(new, new_before["report_hash"])
+    with pipeline.engine.connect() as connection:
+        assert connection.scalar(select(publications.c.current_version_id)) == old
+
+
+@pytest.mark.parametrize(("field", "value"), [("schema_hash", "a" * 64), ("profile", "other")])
+def test_quality_comparison_rejects_incompatible_reports(pipeline, tmp_path, field, value):
+    offset = 0 if field == "schema_hash" else 10
+    old = pipeline.ingest(csv_file(tmp_path / "old.csv", [row(8300 + offset)]), source())
+    new = pipeline.ingest(csv_file(tmp_path / "new.csv", [row(8301 + offset)]), source())
+    with pipeline.engine.begin() as connection:
+        connection.execute(update(versions).where(versions.c.id == new).values({field: value}))
+    with pytest.raises(ETLError, match="^quality_reports_incompatible$"):
+        pipeline.quality_compare(old, new)
+
+
+def test_quality_legacy_and_failed_reports(pipeline, tmp_path):
+    old = pipeline.ingest(csv_file(tmp_path / "old.csv", [row(8400)]), source())
+    new = pipeline.ingest(csv_file(tmp_path / "new.csv", [row(8401)]), source())
+    legacy = pipeline.report(old)["report"]
+    for field in ("quality_format", "source_legal_forms", "accepted_legal_forms"):
+        del legacy[field]
+    with pipeline.engine.begin() as connection:
+        connection.execute(
+            update(versions)
+            .where(versions.c.id == old)
+            .values(report=legacy, report_hash=digest_json(legacy))
+        )
+    legacy_before = pipeline.report(old)
+    assert pipeline.quality_compare(old, new) == {
+        "old_version": old,
+        "new_version": new,
+        "comparison_status": "unavailable",
+        "reason": "legacy_report",
+        "advisories": [],
+    }
+    assert pipeline.report(old) == legacy_before
+    assert pipeline.approve(old, legacy_before["report_hash"])
+    path = csv_file(tmp_path / "failure.csv", [row(8402)], HEADER[:-1])
+    with pytest.raises(ETLError, match="^schema_changed$"):
+        pipeline.ingest(path, source())
+    with pipeline.engine.connect() as connection:
+        failed = connection.execute(
+            select(versions.c.id).where(versions.c.sha256 == file_hash(path))
+        ).scalar_one()
+    with pytest.raises(ETLError, match="^quality_reports_not_validated$"):
+        pipeline.quality_compare(new, failed)
 
 
 def test_sql_diff_is_null_safe_and_case_sensitive(pipeline, tmp_path):

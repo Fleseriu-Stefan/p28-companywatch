@@ -54,7 +54,13 @@ pentru un câmp foarte mare produce eroare de fișier, nu pierdere de conținut.
    + excluded_records`, cu motive, câmpuri nule, CUI zero și grupuri duplicate.
    Numărul pe motiv poate suprapune alte motive; nu se însumează ca total de rânduri.
    Sunt păstrate maximum 20 de exemple cu ordinal/cod, fără chei sau valori brute.
-8. La succes, snapshotul minim este pregătit, staging-ul este șters și versiunea
+8. Rapoartele noi, cu `quality_format: 1`, includ distribuțiile
+   `source_legal_forms` și `accepted_legal_forms`. Prima cuprinde toate
+   rândurile parsate în categoriile SRL, SA, SNC, `missing` și `other`.
+   Valorile necunoscute nu apar în raport. A doua numără SRL, SA și SNC după
+   validare și carantinarea duplicatelor. Totalurile corespund cu
+   `source_records`, respectiv `accepted_records`.
+9. La succes, snapshotul minim este pregătit, staging-ul este șters și versiunea
    intră în `review`. La eșec se elimină numai datele incomplete ale versiunii
    nepublicate și se păstrează raportul agregat de eroare.
 
@@ -110,6 +116,50 @@ dispariție/adăugare; nu există reconciliere automată prin CUI.
 Datele sintetice sunt marcate distinct. Publicarea lor și praguri reduse sunt
 posibile numai în codul de test care optează explicit pentru aceasta; CLI real nu
 oferă opțiuni pentru ocolirea pragului sau publicare sintetică.
+
+## Compararea rapoartelor de calitate
+
+`etl quality-compare OLD_VERSION NEW_VERSION` citește două versiuni alese
+explicit. Acceptă rapoarte complete și sigilate din stările `review`,
+`approved` și `published`. Comparația cere același tip de input, profil,
+amprentă de schemă și format de raport. Dacă un raport vechi nu are noii
+indicatori, rezultatul este `unavailable`, cu motivul `legacy_report`.
+Reingestia identică păstrează raportul existent și sigiliile lui.
+
+Rezultatul include diferențe semnate între numărători și diferențe de rată în
+puncte procentuale. Ratele de acceptare, excludere, carantină și duplicate
+folosesc totalul rândurilor sursă din fiecare ediție. Distribuțiile folosesc
+totalul rândurilor sursă, respectiv acceptate. Rezultatul include ambii
+numitori, iar diferența de rată este `null` dacă un numitor este zero.
+
+Comparația poate semnala apariția duplicatelor de la zero, scăderea numărului
+de rânduri acceptate la zero sau o scădere de cel puțin 40% față de un număr
+anterior pozitiv, când numărul curent rămâne pozitiv. Pragul relativ de 40%
+este o regulă ilustrativă inițială inspirată de cerințele P28 și nu a fost
+validat statistic. Semnalele sunt consultative. Comanda citește rapoartele
+fără a aproba, respinge sau publica versiuni ori a modifica pointerul.
+
+## Deriva schemei și revizuirea propusă a mapării
+
+Antetul aprobat, separatorul și codificarea sunt verificate înainte de
+publicare. O diferență oprește importul. Raportul de eșec consemnează codul
+problemei și identificatorii versiunii, fără a afișa valorile sursă.
+
+Flux propus pentru o etapă ulterioară, cu rolul și autoritatea curatorului
+încă de confirmat (Q-001 și Q-006):
+
+1. Un operator identifică ediția și amprenta antetului ordonat. Anexează
+   dovezi pentru sensul coloanelor schimbate și teste sintetice.
+2. Curatorul verifică maparea explicită către câmpurile canonice. Respinge
+   mapările ambigue, duplicatele de antet, inventarea EUID și eliminarea
+   câmpurilor necesare identificării sau clasificării.
+3. O mapare aprobată urmează poarta Graffino pentru schimbarea parserului.
+   Implementarea ulterioară folosește un profil nou, revalidează intrarea
+   integrală și pregătește o versiune nouă. Aprobarea raportului și publicarea
+   rămân două acțiuni manuale distincte.
+
+M2.1 documentează fluxul și testează blocarea derivei cu profilul actual.
+Mapările la rulare și validarea datelor reale rămân deschise.
 
 ## Verificări fără import real
 

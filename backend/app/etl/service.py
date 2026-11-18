@@ -18,12 +18,67 @@ from app.etl.source import HEADER, LEGAL_FORMS, PROFILE_VERSION, RETAINED, SOURC
 
 DATASET = "onrc-firme-pj"
 FIELDS = tuple(RETAINED.values())
+QUALITY_FORMAT = 1
 
 
 def digest_json(value):
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def count_delta(old, new):
+    return {"old": old, "new": new, "delta": new - old}
+
+
+def rate_delta(old, new, old_total, new_total):
+    return {
+        "old_denominator": old_total,
+        "new_denominator": new_total,
+        "delta_pp": 100 * (new / new_total - old / old_total) if old_total and new_total else None,
+    }
+
+
+def quality_deltas(old, new):
+    metrics = (
+        "accepted_records",
+        "excluded_records",
+        "quarantined_records",
+        "duplicate_key_records",
+    )
+    counts = {
+        metric: count_delta(old[metric], new[metric]) for metric in ("source_records", *metrics)
+    }
+    rates = {
+        metric: rate_delta(old[metric], new[metric], old["source_records"], new["source_records"])
+        for metric in metrics
+    }
+    distributions = {}
+    for key, total in (
+        ("source_legal_forms", "source_records"),
+        ("accepted_legal_forms", "accepted_records"),
+    ):
+        distributions[key] = {
+            form: {
+                "count": count_delta(old[key][form], new[key][form]),
+                "rate": rate_delta(old[key][form], new[key][form], old[total], new[total]),
+            }
+            for form in sorted(old[key])
+        }
+    advisories = []
+    if old["duplicate_key_records"] == 0 < new["duplicate_key_records"]:
+        advisories.append("duplicate_records_appeared")
+    previous, current = old["accepted_records"], new["accepted_records"]
+    if previous > 0 and current == 0:
+        advisories.append("accepted_records_dropped_to_zero")
+    elif previous > 0 and current * 5 <= previous * 3:
+        advisories.append("accepted_records_decreased_at_least_40_percent")
+    return {
+        "counts": counts,
+        "rates": rates,
+        "distributions": distributions,
+        "advisories": advisories,
+    }
 
 
 SCHEMA_HASH = digest_json(
@@ -184,6 +239,7 @@ class Pipeline:
             return version_id
 
         counters, reasons, nulls = Counter(), Counter(), Counter()
+        source_forms = dict.fromkeys((*sorted(LEGAL_FORMS), "missing", "other"), 0)
         # Detect duplicate identities across the entire source without persisting
         # identifiers or personal values from excluded records. This key lives only
         # in this worker; keyed digests and staging rows are deleted on completion.
@@ -192,6 +248,9 @@ class Pipeline:
         try:
             for ordinal, row in records(path):
                 counters["source_records"] += 1
+                form = row["FORMA_JURIDICA"]
+                bucket = form if form in LEGAL_FORMS else "other" if form.strip() else "missing"
+                source_forms[bucket] += 1
                 classification = classify(row)
                 if classification == "natural_person_excluded":
                     counters["excluded_records"] += 1
@@ -250,11 +309,17 @@ class Pipeline:
                     if len(examples) < 20:
                         examples.append({"source_line": ordinal, "codes": ["euid_duplicate"]})
                 connection.execute(update(staging).where(scope, duplicate).values(valid=False))
-                accepted = connection.scalar(
-                    select(func.count())
-                    .select_from(staging)
+                accepted_forms = dict.fromkeys(sorted(LEGAL_FORMS), 0)
+                accepted_rows = connection.execute(
+                    select(staging.c.legal_form, func.count())
                     .where(scope, staging.c.valid.is_(True))
+                    .group_by(staging.c.legal_form)
                 )
+                for form, count in accepted_rows:
+                    if form not in accepted_forms:
+                        raise ETLError("quality_totals_mismatch")
+                    accepted_forms[form] = count
+                accepted = sum(accepted_forms.values())
                 quarantined = connection.scalar(
                     select(func.count())
                     .select_from(staging)
@@ -277,6 +342,9 @@ class Pipeline:
                     "legal_entity_candidates": counters["legal_entity_candidates"],
                     "duplicate_key_groups": duplicate_groups,
                     "duplicate_key_records": duplicate_rows,
+                    "quality_format": QUALITY_FORMAT,
+                    "source_legal_forms": source_forms,
+                    "accepted_legal_forms": accepted_forms,
                     "cui_zero": counters["cui_zero"],
                     "null_fields": dict(nulls),
                     "reasons": dict(reasons),
@@ -385,6 +453,37 @@ class Pipeline:
                 "manifest",
             )
         }
+
+    def quality_compare(self, old_id, new_id):
+        old, new = self.report(old_id), self.report(new_id)
+        if any(v["source_kind"] == "synthetic" for v in (old, new)) and not self.allow_synthetic:
+            raise ETLError("synthetic_not_allowed")
+        for version in (old, new):
+            report = version["report"]
+            if version["state"] not in {"review", "approved", "published"} or not (
+                report and report.get("full_file_validated")
+            ):
+                raise ETLError("quality_reports_not_validated")
+            if digest_json(report) != version["report_hash"]:
+                raise ETLError("report_changed")
+        if any(old[key] != new[key] for key in ("source_kind", "profile", "schema_hash")):
+            raise ETLError("quality_reports_incompatible")
+        result = {"old_version": old["id"], "new_version": new["id"]}
+        formats = {old["report"].get("quality_format"), new["report"].get("quality_format")}
+        if formats == {QUALITY_FORMAT}:
+            return {
+                **result,
+                "comparison_status": "comparable",
+                **quality_deltas(old["report"], new["report"]),
+            }
+        if formats.issubset({None, QUALITY_FORMAT}):
+            return {
+                **result,
+                "comparison_status": "unavailable",
+                "reason": "legacy_report",
+                "advisories": [],
+            }
+        raise ETLError("quality_reports_incompatible")
 
     def _validate_seal(self, version, *, verify_data=True):
         report = version["report"]
