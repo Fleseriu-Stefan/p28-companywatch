@@ -30,14 +30,10 @@ It is now published at https://github.com/Fleseriu-Stefan/p28-companywatch.
 Remote `origin` points to that repository; local `main` tracks `origin/main`.
 Follow AGENTS.md synchronization rules now that the remote and upstream exist.
 Explicit user authorization overrides automatic branch and commit steps in the original templates.
-Current permission covers the approved M2 ETL implementation and verification with
-synthetic fixtures and isolated MySQL, including explicitly authorized migration
-test evolution. Full real downloads and changes to existing MySQL data are not authorized.
-Existing publication does not authorize future commits, merges, pushes or deploys.
-No commit, merge, push or deploy is authorized by the current M2 request.
-Team, ClickUp and Slack addons are disabled; their conditional template sections do not apply.
-Do not create tickets, PRs or external messages. The local M1 verification
-workflow under `.github/workflows/` is explicitly authorized; publishing is not.
+M1 and M2 are merged into `main`. The verification workflow runs on pull
+requests and pushes to `main`. Each new commit, push, PR, merge, deployment,
+full ONRC download or change to the existing M1 database requires authorization
+for that action. Team, ClickUp and Slack addons are disabled by user choice.
 
 ## Design
 Keep local mocks, tokens and screenshots under docs/design/.

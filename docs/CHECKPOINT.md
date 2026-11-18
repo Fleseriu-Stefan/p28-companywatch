@@ -3,10 +3,11 @@
 Acest document urmărește cerințele comunicate de utilizator. Nu reprezintă o
 confirmare a întregii grile a profesorului; grila completă nu a fost furnizată.
 M1 este integrat în `main`, la `c5c0b71`. Baza M1 a rămas la revizia
-`0001_baseline` pe volumul original. M2 este implementat local pe
-`feat/m2-etl`. Ultima rulare completă izolată cu date sintetice a trecut
-46 de teste. Starea verificărilor este în [M1-VERIFICATION.md](M1-VERIFICATION.md)
-și [M2-VERIFICATION.md](M2-VERIFICATION.md).
+`0001_baseline` pe volumul original la verificarea M2. M2 este integrat în
+`main`, la `b8a2b6f`. Verificările CI pe `main` au trecut pentru ambele
+milestone-uri. Rularea locală completă M2 a trecut 46 de teste cu date sintetice
+și MySQL izolat. Vezi [M1-VERIFICATION.md](M1-VERIFICATION.md) și
+[M2-VERIFICATION.md](M2-VERIFICATION.md).
 
 | Livrabil | Stare curentă M1 și M2 | Dovezi necesare în etapa următoare |
 |---|---|---|

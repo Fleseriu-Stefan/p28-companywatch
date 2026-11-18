@@ -1,15 +1,18 @@
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 from collections import Counter
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from time import monotonic
 from uuid import uuid4
 
+from pymysql.err import MySQLError
 from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 
 from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
@@ -18,12 +21,69 @@ from app.etl.source import HEADER, LEGAL_FORMS, PROFILE_VERSION, RETAINED, SOURC
 
 DATASET = "onrc-firme-pj"
 FIELDS = tuple(RETAINED.values())
+QUALITY_FORMAT = 1
+logger = logging.getLogger(__name__)
+INGEST_DATABASE_ERRORS = (SQLAlchemyError, MySQLError)
 
 
 def digest_json(value):
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def count_delta(old, new):
+    return {"old": old, "new": new, "delta": new - old}
+
+
+def rate_delta(old, new, old_total, new_total):
+    return {
+        "old_denominator": old_total,
+        "new_denominator": new_total,
+        "delta_pp": 100 * (new / new_total - old / old_total) if old_total and new_total else None,
+    }
+
+
+def quality_deltas(old, new):
+    metrics = (
+        "accepted_records",
+        "excluded_records",
+        "quarantined_records",
+        "duplicate_key_records",
+    )
+    counts = {
+        metric: count_delta(old[metric], new[metric]) for metric in ("source_records", *metrics)
+    }
+    rates = {
+        metric: rate_delta(old[metric], new[metric], old["source_records"], new["source_records"])
+        for metric in metrics
+    }
+    distributions = {}
+    for key, total in (
+        ("source_legal_forms", "source_records"),
+        ("accepted_legal_forms", "accepted_records"),
+    ):
+        distributions[key] = {
+            form: {
+                "count": count_delta(old[key][form], new[key][form]),
+                "rate": rate_delta(old[key][form], new[key][form], old[total], new[total]),
+            }
+            for form in sorted(old[key])
+        }
+    advisories = []
+    if old["duplicate_key_records"] == 0 < new["duplicate_key_records"]:
+        advisories.append("duplicate_records_appeared")
+    previous, current = old["accepted_records"], new["accepted_records"]
+    if previous > 0 and current == 0:
+        advisories.append("accepted_records_dropped_to_zero")
+    elif previous > 0 and current * 5 <= previous * 3:
+        advisories.append("accepted_records_decreased_at_least_40_percent")
+    return {
+        "counts": counts,
+        "rates": rates,
+        "distributions": distributions,
+        "advisories": advisories,
+    }
 
 
 SCHEMA_HASH = digest_json(
@@ -47,19 +107,76 @@ def file_hash(path):
     return digest.hexdigest()
 
 
+def log_ingest_operation(level, operation, outcome, started_at, driver_code=None):
+    elapsed_ms = (monotonic() - started_at) * 1000
+    message = "operation=%s outcome=%s elapsed_ms=%.1f"
+    if driver_code is None:
+        logger.log(level, message, operation, outcome, elapsed_ms)
+    else:
+        logger.log(level, message + " driver_code=%d", operation, outcome, elapsed_ms, driver_code)
+
+
+def log_ingest_sql_failure(connection, operation, started_at, error):
+    disconnected = connection.invalidated
+    driver_code = None
+    driver_error = error
+    if isinstance(error, DBAPIError):
+        disconnected = disconnected or error.connection_invalidated
+        driver_error = error.orig
+    if isinstance(error, DBAPIError) or isinstance(driver_error, MySQLError):
+        args = getattr(driver_error, "args", ())
+        if args and type(args[0]) is int:
+            driver_code = args[0]
+    outcome = "connection_invalidated" if disconnected else "sql_operation_failed"
+    log_ingest_operation(logging.WARNING, operation, outcome, started_at, driver_code)
+
+
+@contextmanager
+def ingest_operation(connection, operation):
+    started_at = monotonic()
+    try:
+        yield
+    except INGEST_DATABASE_ERRORS as error:
+        log_ingest_sql_failure(connection, operation, started_at, error)
+        raise
+    else:
+        if logger.isEnabledFor(logging.DEBUG):
+            log_ingest_operation(logging.DEBUG, operation, "completed", started_at)
+
+
 @contextmanager
 def ingest_transaction(connection, lock_name):
+    started_at = monotonic()
     if connection.invalidated:
+        log_ingest_operation(logging.WARNING, "check_lock", "connection_invalidated", started_at)
         raise ETLError("ingest_lock_lost")
+    phase = "begin_transaction"
+    body_error = None
     try:
         with connection.begin():
-            owns_lock = connection.scalar(
-                text("SELECT IS_USED_LOCK(:name) = CONNECTION_ID()"), {"name": lock_name}
-            )
-            if owns_lock != 1:
-                raise ETLError("ingest_lock_lost")
-            yield
-    except SQLAlchemyError:
+            try:
+                started_at = monotonic()
+                with ingest_operation(connection, "check_lock"):
+                    owns_lock = connection.scalar(
+                        text("SELECT IS_USED_LOCK(:name) = CONNECTION_ID()"), {"name": lock_name}
+                    )
+                if owns_lock != 1:
+                    log_ingest_operation(
+                        logging.WARNING, "check_lock", "lock_ownership_lost", started_at
+                    )
+                    raise ETLError("ingest_lock_lost")
+                yield
+            except BaseException as error:
+                body_error = error
+                phase = "rollback_transaction"
+                started_at = monotonic()
+                raise
+            phase = "commit_transaction"
+            started_at = monotonic()
+    except INGEST_DATABASE_ERRORS as error:
+        # The body already logs SQL failures. Log a second error only if transaction exit fails.
+        if error is not body_error:
+            log_ingest_sql_failure(connection, phase, started_at, error)
         if connection.invalidated:
             raise ETLError("ingest_lock_lost") from None
         raise
@@ -78,27 +195,38 @@ class Pipeline:
         )
         # A server-side session lock is released even if the worker process dies.
         # Holding it proves any old loading attempt for this input is abandoned.
-        with self.engine.connect() as connection:
-            try:
-                acquired = connection.scalar(text("SELECT GET_LOCK(:name, 0)"), {"name": lock_name})
-                connection.commit()
-            except SQLAlchemyError:
-                connection.invalidate()
-                raise
-            if acquired != 1:
-                raise ETLError("version_busy")
-            try:
-                return self._ingest(connection, lock_name, path, source, sha256, transfer=transfer)
-            finally:
-                if not connection.invalidated:
-                    try:
-                        released = connection.scalar(
-                            text("SELECT RELEASE_LOCK(:name)"), {"name": lock_name}
+        try:
+            with self.engine.connect() as connection:
+                try:
+                    with ingest_operation(connection, "acquire_lock"):
+                        acquired = connection.scalar(
+                            text("SELECT GET_LOCK(:name, 0)"), {"name": lock_name}
                         )
-                    except SQLAlchemyError:
-                        released = None
-                    if released != 1:
-                        connection.invalidate()
+                    with ingest_operation(connection, "commit_lock_acquisition"):
+                        connection.commit()
+                except INGEST_DATABASE_ERRORS:
+                    connection.invalidate()
+                    raise
+                if acquired != 1:
+                    raise ETLError("version_busy")
+                try:
+                    return self._ingest(
+                        connection, lock_name, path, source, sha256, transfer=transfer
+                    )
+                finally:
+                    if not connection.invalidated:
+                        try:
+                            with ingest_operation(connection, "release_lock"):
+                                released = connection.scalar(
+                                    text("SELECT RELEASE_LOCK(:name)"), {"name": lock_name}
+                                )
+                        except INGEST_DATABASE_ERRORS:
+                            released = None
+                        if released != 1:
+                            connection.invalidate()
+        except INGEST_DATABASE_ERRORS:
+            # Preserve the CLI's safe error code for callers of the pipeline itself.
+            raise ETLError("database_error") from None
 
     def _ingest(self, connection, lock_name, path, source, sha256, *, transfer=None):
         if source.kind not in {"real", "synthetic"}:
@@ -116,7 +244,10 @@ class Pipeline:
             versions.c.sha256 == sha256,
             versions.c.profile == PROFILE_VERSION,
         )
-        with ingest_transaction(connection, lock_name):
+        with (
+            ingest_transaction(connection, lock_name),
+            ingest_operation(connection, "prepare_attempt"),
+        ):
             statement = mysql_insert(versions).values(
                 id=candidate,
                 edition=source.edition,
@@ -184,6 +315,7 @@ class Pipeline:
             return version_id
 
         counters, reasons, nulls = Counter(), Counter(), Counter()
+        source_forms = dict.fromkeys((*sorted(LEGAL_FORMS), "missing", "other"), 0)
         # Detect duplicate identities across the entire source without persisting
         # identifiers or personal values from excluded records. This key lives only
         # in this worker; keyed digests and staging rows are deleted on completion.
@@ -192,6 +324,9 @@ class Pipeline:
         try:
             for ordinal, row in records(path):
                 counters["source_records"] += 1
+                form = row["FORMA_JURIDICA"]
+                bucket = form if form in LEGAL_FORMS else "other" if form.strip() else "missing"
+                source_forms[bucket] += 1
                 classification = classify(row)
                 if classification == "natural_person_excluded":
                     counters["excluded_records"] += 1
@@ -238,36 +373,49 @@ class Pipeline:
                 )
                 duplicate = staging.c.key_digest.in_(select(duplicate_keys.c.key_digest))
                 scope = staging.c.version_id == version_id
-                duplicate_groups = connection.scalar(
-                    select(func.count()).select_from(duplicate_keys)
-                )
-                duplicate_rows = connection.scalar(
-                    select(func.count()).select_from(staging).where(scope, duplicate)
-                )
-                for ordinal in connection.scalars(
-                    select(staging.c.source_line).where(scope, duplicate).limit(20)
-                ):
-                    if len(examples) < 20:
-                        examples.append({"source_line": ordinal, "codes": ["euid_duplicate"]})
-                connection.execute(update(staging).where(scope, duplicate).values(valid=False))
-                accepted = connection.scalar(
-                    select(func.count())
-                    .select_from(staging)
-                    .where(scope, staging.c.valid.is_(True))
-                )
-                quarantined = connection.scalar(
-                    select(func.count())
-                    .select_from(staging)
-                    .where(scope, staging.c.valid.is_(False), staging.c.excluded.is_(False))
-                )
-                connection.execute(
-                    insert(companies).from_select(
-                        ["version_id", *FIELDS],
-                        select(staging.c.version_id, *(staging.c[key] for key in FIELDS)).where(
-                            scope, staging.c.valid.is_(True)
-                        ),
+                with ingest_operation(connection, "count_duplicate_groups"):
+                    duplicate_groups = connection.scalar(
+                        select(func.count()).select_from(duplicate_keys)
                     )
-                )
+                with ingest_operation(connection, "count_duplicate_rows"):
+                    duplicate_rows = connection.scalar(
+                        select(func.count()).select_from(staging).where(scope, duplicate)
+                    )
+                with ingest_operation(connection, "sample_duplicate_rows"):
+                    for ordinal in connection.scalars(
+                        select(staging.c.source_line).where(scope, duplicate).limit(20)
+                    ):
+                        if len(examples) < 20:
+                            examples.append({"source_line": ordinal, "codes": ["euid_duplicate"]})
+                with ingest_operation(connection, "quarantine_duplicates"):
+                    connection.execute(update(staging).where(scope, duplicate).values(valid=False))
+                accepted_forms = dict.fromkeys(sorted(LEGAL_FORMS), 0)
+                with ingest_operation(connection, "count_accepted_forms"):
+                    accepted_rows = connection.execute(
+                        select(staging.c.legal_form, func.count())
+                        .where(scope, staging.c.valid.is_(True))
+                        .group_by(staging.c.legal_form)
+                    )
+                    for form, count in accepted_rows:
+                        if form not in accepted_forms:
+                            raise ETLError("quality_totals_mismatch")
+                        accepted_forms[form] = count
+                accepted = sum(accepted_forms.values())
+                with ingest_operation(connection, "count_quarantined_rows"):
+                    quarantined = connection.scalar(
+                        select(func.count())
+                        .select_from(staging)
+                        .where(scope, staging.c.valid.is_(False), staging.c.excluded.is_(False))
+                    )
+                with ingest_operation(connection, "copy_prepared_rows"):
+                    connection.execute(
+                        insert(companies).from_select(
+                            ["version_id", *FIELDS],
+                            select(staging.c.version_id, *(staging.c[key] for key in FIELDS)).where(
+                                scope, staging.c.valid.is_(True)
+                            ),
+                        )
+                    )
                 reasons["euid_duplicate"] = duplicate_rows
                 report = {
                     "source_records": counters["source_records"],
@@ -277,6 +425,9 @@ class Pipeline:
                     "legal_entity_candidates": counters["legal_entity_candidates"],
                     "duplicate_key_groups": duplicate_groups,
                     "duplicate_key_records": duplicate_rows,
+                    "quality_format": QUALITY_FORMAT,
+                    "source_legal_forms": source_forms,
+                    "accepted_legal_forms": accepted_forms,
                     "cui_zero": counters["cui_zero"],
                     "null_fields": dict(nulls),
                     "reasons": dict(reasons),
@@ -294,34 +445,40 @@ class Pipeline:
                 }
                 if report["source_records"] != accepted + quarantined + report["excluded_records"]:
                     raise ETLError("quality_totals_mismatch")
-                connection.execute(delete(staging).where(scope))
+                with ingest_operation(connection, "clear_staging"):
+                    connection.execute(delete(staging).where(scope))
             with ingest_transaction(connection, lock_name):
-                prepared_hash = self._prepared_hash(connection, version_id)
-                connection.execute(
-                    update(versions)
-                    .where(versions.c.id == version_id)
-                    .values(
-                        state="review",
-                        report=report,
-                        report_hash=digest_json(report),
-                        prepared_hash=prepared_hash,
+                with ingest_operation(connection, "hash_prepared_rows"):
+                    prepared_hash = self._prepared_hash(connection, version_id)
+                with ingest_operation(connection, "record_review"):
+                    connection.execute(
+                        update(versions)
+                        .where(versions.c.id == version_id)
+                        .values(
+                            state="review",
+                            report=report,
+                            report_hash=digest_json(report),
+                            prepared_hash=prepared_hash,
+                        )
                     )
-                )
-                connection.execute(
-                    update(attempts).where(attempts.c.id == attempt_id).values(state="ready")
-                )
+                    connection.execute(
+                        update(attempts).where(attempts.c.id == attempt_id).values(state="ready")
+                    )
             return version_id
-        except (ETLError, SQLAlchemyError, OSError) as error:
+        except (ETLError, OSError, *INGEST_DATABASE_ERRORS) as error:
             code = (
                 str(error)
                 if isinstance(error, ETLError)
                 else "database_error"
-                if isinstance(error, SQLAlchemyError)
+                if isinstance(error, INGEST_DATABASE_ERRORS)
                 else "artifact_error"
             )
             if connection.invalidated or code == "ingest_lock_lost":
                 raise ETLError("ingest_lock_lost") from None
-            with ingest_transaction(connection, lock_name):
+            with (
+                ingest_transaction(connection, lock_name),
+                ingest_operation(connection, "record_failed_attempt"),
+            ):
                 connection.execute(delete(staging).where(staging.c.version_id == version_id))
                 connection.execute(delete(companies).where(companies.c.version_id == version_id))
                 report = {
@@ -343,7 +500,7 @@ class Pipeline:
             raise ETLError(code) from None
 
     def _stage(self, connection, lock_name, batch):
-        with ingest_transaction(connection, lock_name):
+        with ingest_transaction(connection, lock_name), ingest_operation(connection, "stage_batch"):
             connection.execute(insert(staging), batch)
 
     def _prepared_hash(self, connection, version_id):
@@ -385,6 +542,37 @@ class Pipeline:
                 "manifest",
             )
         }
+
+    def quality_compare(self, old_id, new_id):
+        old, new = self.report(old_id), self.report(new_id)
+        if any(v["source_kind"] == "synthetic" for v in (old, new)) and not self.allow_synthetic:
+            raise ETLError("synthetic_not_allowed")
+        for version in (old, new):
+            report = version["report"]
+            if version["state"] not in {"review", "approved", "published"} or not (
+                report and report.get("full_file_validated")
+            ):
+                raise ETLError("quality_reports_not_validated")
+            if digest_json(report) != version["report_hash"]:
+                raise ETLError("report_changed")
+        if any(old[key] != new[key] for key in ("source_kind", "profile", "schema_hash")):
+            raise ETLError("quality_reports_incompatible")
+        result = {"old_version": old["id"], "new_version": new["id"]}
+        formats = {old["report"].get("quality_format"), new["report"].get("quality_format")}
+        if formats == {QUALITY_FORMAT}:
+            return {
+                **result,
+                "comparison_status": "comparable",
+                **quality_deltas(old["report"], new["report"]),
+            }
+        if formats.issubset({None, QUALITY_FORMAT}):
+            return {
+                **result,
+                "comparison_status": "unavailable",
+                "reason": "legacy_report",
+                "advisories": [],
+            }
+        raise ETLError("quality_reports_incompatible")
 
     def _validate_seal(self, version, *, verify_data=True):
         report = version["report"]

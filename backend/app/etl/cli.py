@@ -47,6 +47,9 @@ def main(argv=None):
     diff = commands.add_parser("diff")
     diff.add_argument("old_version")
     diff.add_argument("new_version")
+    quality_compare = commands.add_parser("quality-compare")
+    quality_compare.add_argument("old_version")
+    quality_compare.add_argument("new_version")
     args = parser.parse_args(argv)
     if args.command == "sources":
         print(
@@ -94,6 +97,8 @@ def main(argv=None):
         elif args.command == "publish":
             pipeline.publish(args.version, args.approval)
             result = {"version": args.version, "state": "published"}
+        elif args.command == "quality-compare":
+            result = pipeline.quality_compare(args.old_version, args.new_version)
         else:
             result = pipeline.diff(args.old_version, args.new_version)
         print(json.dumps(result, sort_keys=True, ensure_ascii=False))

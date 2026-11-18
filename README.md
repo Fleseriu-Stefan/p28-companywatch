@@ -5,13 +5,18 @@ tehnică: FastAPI, MySQL, migrări Alembic, Docker Compose, structură React cu
 TypeScript/Vite, teste și CI. M2 adaugă pipeline ETL, snapshoturi minimale și diff
 SQL, verificate cu date sintetice. Nu s-au importat încă date reale și nu există dashboard.
 
+M1 și M2 sunt integrate în `main`, iar verificările GitHub Actions au trecut.
+Vezi [verificarea M1](docs/M1-VERIFICATION.md) și
+[verificarea M2](docs/M2-VERIFICATION.md).
+
 Cele două ediții ONRC sunt aprobate pentru dezvoltare, cu validare integrală
 obligatorie înainte de publicare. Interfața vizuală necesită
 aprobarea unei versiuni Figma înainte de implementare. Lista separată a
 livrabilelor rămase este în [docs/CHECKPOINT.md](docs/CHECKPOINT.md).
 Ghidul M2, limitele și pașii pentru un import real viitor sunt în
-[docs/M2-ETL.md](docs/M2-ETL.md); sursele și filtrul persoanelor juridice sunt în
-[docs/ONRC-SOURCE.md](docs/ONRC-SOURCE.md).
+[docs/M2-ETL.md](docs/M2-ETL.md). [DATA.md](DATA.md) rezumă proveniența,
+eșantioanele verificate și limitele datelor. Protocolul de măsurare pe date
+sintetice este în [docs/M2.1-BENCHMARK.md](docs/M2.1-BENCHMARK.md).
 
 ## Cerințe de instalare
 
@@ -152,9 +157,8 @@ migrări nu constituie dovadă de ingestie ETL idempotentă.
 
 Workflow-ul [.github/workflows/ci.yml](.github/workflows/ci.yml) execută aceeași
 verificare la pull request și push pe `main`, cu permisiune `contents: read`.
-Nu conține deploy și nu necesită secrete de repository. Execuția pe GitHub va fi
-disponibilă după o publicare autorizată; un rezultat local nu este un rezultat CI
-executat pe GitHub.
+Workflow-ul verifică aplicația fără deploy și folosește credențiale generate pentru
+baza izolată de test.
 
 ## Oprire și diagnostic
 
@@ -184,8 +188,6 @@ a reporni API-ul; nu modifica manual revizia ca să maschezi eroarea.
 | `frontend/` | React/TypeScript/Vite, fără UI |
 | `compose.yaml` | Servicii și unelte Docker |
 | `scripts/verify.py` | Verificare izolată completă |
-| `docs/agents/` | Decizii, contracte, patterns și întrebări |
+| `docs/agents/` | [Arhitectura M1 și M2](docs/agents/ARCHITECTURE.md), decizii, contracte, patterns și întrebări |
 | `docs/design/` | Reguli și viitoare designuri aprobate |
 | `docs/CHECKPOINT.md` | Livrabilele încă lipsă |
-
-Nu s-a autorizat commit, merge, push sau deploy prin cererea curentă M2.

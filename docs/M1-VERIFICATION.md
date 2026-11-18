@@ -1,8 +1,10 @@
 # M1 — implementare și verificare
 
-Data: 2026-11-17. Ramură locală: `feat/m1-foundation`.
+Verificarea locală inițială a avut loc pe `feat/m1-foundation` la 2026-11-17.
 Planul M1, D-003–D-005 și C-001 au fost aprobate explicit de utilizator.
-Nu s-au făcut commit, merge, push sau deploy.
+Ulterior, M1 a fost integrat în `main` prin
+[PR #1](https://github.com/Fleseriu-Stefan/p28-companywatch/pull/1), la `c5c0b71`.
+[GitHub Actions a trecut pe commitul din main](https://github.com/Fleseriu-Stefan/p28-companywatch/actions/runs/44161857724).
 
 ## Rezultatul execuției complete
 
@@ -70,8 +72,6 @@ aserțiune de test nu a fost relaxată sau eliminată.
   un nou client HTTP în afara planului aprobat.
 - npm a semnalat scriptul de instalare esbuild în politica sa `allowScripts`.
   Build-ul Vite a trecut cu configurația imaginii Node fixate.
-- CI pe GitHub nu a rulat: workflow-ul este local, fără push autorizat. Comanda
-  executată local este aceeași comandă configurată în workflow.
 - Screenshots/UI nu s-au executat: nu există interfață vizuală aprobată în Figma.
 - Nu s-au verificat date ONRC, nu s-a realizat un interviu și nu s-a făcut deploy.
   Aceste lipsuri sunt urmărite separat în [CHECKPOINT.md](CHECKPOINT.md).
@@ -125,4 +125,4 @@ elimină propriul volum temporar la cleanup.
 Aplicația locală a fost verificată separat: endpointurile live, ready și docs au
 răspuns HTTP 200, MySQL a răspuns la SELECT 1, iar Alembic a raportat
 `0001_baseline (head)`. Nu s-au schimbat funcționalități sau aserțiuni de test
-în pregătirea commitului. CI pe GitHub rămâne neexecutat.
+în pregătirea commitului.
