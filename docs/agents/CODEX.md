@@ -42,18 +42,17 @@ approve designs. Preserve the approved representations as versioned local mocks
 in docs/design/mocks/ and verify their correspondence to the approved Figma version
 before implementation. Record the frame reference, approved version and confirmation date.
 Implement from those approved local mocks and documented tokens.
-No Figma file link, Figma MCP integration, design board, publishing integration or
-screenshot command is configured. Do not assume access to Figma or Claude board tools,
-create a board or publish anything implicitly. Report unavailable access when needed.
-Q-004 blocks implementation until UI requirements and verification are confirmed.
+Q-004 records the approved CompanyWatch Draft 1 design and its review procedure.
+Use the [registered Figma references and mockups](../design/registry.yaml). Verify
+Figma access for each session. A design board requires separate authorization.
 
 ## Verification
 Run the ledger checker with --fix, then without --fix.
 Check frontmatter, local documentation paths and Git ignore rules.
 Run `python3 scripts/verify.py` for the approved M1/M2 application checks in Docker.
 It uses an isolated MySQL volume and generated in-memory credentials. See README.md.
-Screenshots remain unavailable because visual UI requirements and tooling are unapproved.
-Report unavailable checks honestly; never substitute invented commands.
+Draft 1 has registered Chromium reference captures. Include the application
+screenshot command in any UI implementation plan. Report unavailable checks honestly.
 
 ## Sources
 - Local Graffino skill: release 1.4.0, marker version v1.

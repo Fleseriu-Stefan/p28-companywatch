@@ -103,13 +103,12 @@ them; a ticket with UI has a design subtask instead (team addon).
 ## Source
 - Design board: none configured.
 - Figma: design creation and visual approval under D-002. [Etapa D · Registrul ONRC](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl).
-- Token source for design: the approved Section D tokens below. The application has no visual token source yet.
+- [Approved Registrul ONRC tokens and review references](#etapa-d--registrul-onrc).
 
 ## Tokens
 
-The project owner approved these tokens and dashboard design rules in Lab 1
-Section D. Screen-specific Figma and matching repository mock approval still
-follow D-002 and Q-004.
+This section records the earlier dashboard design direction. The nine approved
+Registrul ONRC screens use the tokens documented in [Etapa D](#etapa-d--registrul-onrc).
 
 ### Color
 
@@ -233,9 +232,9 @@ ONRC terminology accurate.
   Check keyboard access to search, navigation, edition selectors, filters,
   chart disclosures and exports.
 
-Use `DS-CW-dashboard` for the first design registration. Review the populated
-and first-visit states in both themes at 360 px and 1440 px. Verify the matching
-repository mock against the specific Figma version before recording approval.
+The earlier `DS-CW-dashboard` draft specifies populated and first-visit review
+states in both themes at 360 px and 1440 px. Its registry entry records its own
+approval status.
 
 ## V4 visual review direction
 
@@ -323,28 +322,15 @@ Use the Figma references and available access for the specific review. An option
 design board requires separate authorization. [Codex workflow](../agents/CODEX.md).
 
 
-## Propunere pentru Etapa D · Registrul ONRC
+## Etapa D · Registrul ONRC
 
-**Stare:** draft pentru evaluare vizuală. Propunerea lasă în vigoare tokenurile
-și regulile confirmate anterior până la o decizie explicită. D-002 cere
-aprobarea versiunii Figma și verificarea mockupului local corespunzător.
-[Deschide prototipul interactiv](mocks/registrul-onrc/index.html).
+Proprietarul proiectului a aprobat explicit toate cele nouă ecrane din **Draft 1**
+la **2026-11-19**, după ce a confirmat personal echivalența vizuală dintre cadrele
+Figma de evaluare și mockupul HTML, conform D-002. Fiecare intrare DS- din
+registru identifică ruta ecranului, cadrele Figma și revizia mockupului aprobat.
+[Prototip interactiv](mocks/registrul-onrc/index.html) · [Revizia aprobată](https://github.com/Fleseriu-Stefan/p28-companywatch/tree/2dc3bf2c6823ca733bc8d4b045a4dea241055106/docs/design/mocks/registrul-onrc).
 
-### Schimbarea propusă
-
-```text
-PROPOSAL: change
-- Existing: Secțiunea Tokens consemnează paleta confirmată anterior.
-- Proposed: Adoptă noile tokenuri, lățimile de evaluare și referințele DS- către ecranele din prototipul comun.
-- Why now: Etapa D cere o identitate luminoasă și o căutare dominantă pentru fluxul ONRC.
-- Impact: DESIGN.md, registry.yaml, cele nouă ecrane draft și viitoarele componente React.
-- If approved: Păstrează paleta anterioară ca istoric și înregistrează referințele Figma, varianta și data aprobării.
-```
-
-Procedura D-002 se aplică fiecărui ecran. În această propunere, referința
-locală DS- include ruta ecranului din prototipul HTML comun.
-
-### Sistem de design propus
+### Sistem de design aprobat pentru cele nouă ecrane
 
 | Rol | Luminos | Întunecat |
 | --- | --- | --- |
@@ -367,7 +353,7 @@ locală DS- include ruta ecranului din prototipul HTML comun.
   Sub 1088 px, coloanele principale se așază vertical. Sub 896 px, meniul
   lateral se deschide din antet. Sub 640 px, perechile de ediții și rândurile
   tabelelor se așază vertical, cu etichetele valorilor vizibile. Lățimi de
-  evaluare propuse 360, 768 și 1440 px.
+  evaluare de 360, 768 și 1440 px.
 - Separarea vizuală pornește de la o căutare albastru închis și suprafețe deschise
   pentru lucru. Rezultatele, profilul și comparația rămân în același ecran.
   Indicatorii datasetului apar în Comparații, Analiză și Calitatea datelor.
@@ -402,12 +388,11 @@ rămân în întrebările deschise din ledger.
 - Navigare grupată, controale predictibile și o ierarhie tipografică în care conținutul are prioritate. [shadcn/ui](https://ui.shadcn.com/blocks/dashboard) · [Linear](https://linear.app/now/behind-the-latest-design-refresh)
 
 
-### Pachet pentru aprobarea vizuală
+### Pachetul aprobat pentru evaluarea vizuală
 
 **Etapa D · Registrul ONRC · Draft 1** folosește bara laterală originală și
 controalele „Perspectivă”, „Stare” și „Temă” alese pentru antet. La lățimi mici,
-butonul „Meniu” deschide aceeași navigare. Aprobarea D-002 așteaptă confirmarea
-vizuală a proprietarului proiectului.
+butonul „Meniu” deschide aceeași navigare.
 
 Cele 40 de cadre de referință din același fișier Figma conțin capturile Chromium
 din depozit, verificate după amprenta imaginii și dimensiunile cadrului. Setul
@@ -415,7 +400,7 @@ acoperă cele nouă ecrane la 360 și 1440 px în ambele teme și patru stări a
 căutării pe desktop luminos. La 768 px și pentru interacțiunile cu meniul și
 controalele se folosește prototipul HTML. Importul editabil auxiliar din Figma
 reflectă un import anterior, cu antetul de verificare absent și diferențe de
-fonturi și efecte CSS. Confirmarea vizuală se face pe cadrele de referință Chromium.
+fonturi și efecte CSS. Aprobarea vizuală acoperă cadrele de referință Chromium.
 
 - [Cadre Figma desktop](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=44-2) · [cadre mobile](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=41-2) · [stări ale căutării](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=42-2).
 - [Capturi locale desktop](screens/registrul-onrc/1440) · [mobil](screens/registrul-onrc/360) · [stări](screens/registrul-onrc/states).

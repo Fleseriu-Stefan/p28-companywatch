@@ -14,12 +14,13 @@ designs:
         design_ref: mocks/DS-CW-dashboard-v2.html
         figma_ref: https://www.figma.com/design/JQJkLRJU7hZGPSOFW2tTYq?node-id=28-2
 
-  # Etapa D · Registrul ONRC · Draft 1. Referințele Figma conțin capturile
-  # Chromium actualizate. Aprobarea D-002 așteaptă confirmarea proprietarului.
+  # Etapa D · Registrul ONRC · Draft 1, aprobat conform D-002.
   - id: DS-CW-registru
     kind: screen
     name: Căutare, profil și comparația firmei
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#firme"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=44-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"
@@ -48,7 +49,9 @@ designs:
   - id: DS-CW-istoric
     kind: screen
     name: Istoric observat al firmei
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#istoric"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=47-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"
@@ -69,7 +72,9 @@ designs:
   - id: DS-CW-editii
     kind: screen
     name: Comparația edițiilor ONRC
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#editii"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=50-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"
@@ -90,7 +95,9 @@ designs:
   - id: DS-CW-analiza
     kind: screen
     name: Analiză ONRC și export grupat
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#analiza"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=53-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"
@@ -111,7 +118,9 @@ designs:
   - id: DS-CW-vizualizari
     kind: screen
     name: Vizualizări salvate
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#vizualizari"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=55-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"
@@ -132,7 +141,9 @@ designs:
   - id: DS-CW-calitate
     kind: screen
     name: Calitatea datelor și ingestie
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#calitate"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=57-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"
@@ -153,7 +164,9 @@ designs:
   - id: DS-CW-schema
     kind: screen
     name: Revizuirea schemei
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#schema"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=59-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"
@@ -174,7 +187,9 @@ designs:
   - id: DS-CW-api
     kind: screen
     name: API și documentația sursei
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#api"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=60-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"
@@ -195,7 +210,9 @@ designs:
   - id: DS-CW-acces
     kind: screen
     name: Administrarea utilizatorilor, rolurilor și cheilor
-    status: draft
+    status: approved
+    approved_on: "2026-11-19"
+    approved_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
     design_ref: "mocks/registrul-onrc/index.html#acces"
     figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=62-2
     figma_review: "Etapa D · Registrul ONRC · Draft 1"

@@ -20,7 +20,7 @@ milestone-uri. Rularea locală completă M2 a trecut 46 de teste cu date sinteti
 | Rapoarte de calitate | Implementate; rezultate sintetice | Rapoarte complete pe cele două exporturi reale |
 | Diff calculat în SQL | Implementat și testat pe MySQL izolat | Rezultatul pentru versiunile reale publicate manual |
 | Detectarea schimbărilor de schemă | Profil strict și blocare implementate | Validarea profilului pe întregul export și review la schimbări |
-| Dashboard interactiv | Blocat de aprobarea designului | Cerințe, versiune Figma aprobată, mock-uri locale, tokens și screenshots |
+| Dashboard interactiv | Etapa D încheiată cu aprobarea celor nouă ecrane Draft 1, conform D-002 | Plan de implementare aprobat, dashboard funcțional și verificare vizuală față de [designul aprobat](design/DESIGN.md#etapa-d--registrul-onrc) |
 | Interviu | Rezumatul interviului real este în [INTERVIEW.md](../INTERVIEW.md). Auditul Secțiunii C este aprobat. | Feedback real după demonstrația funcțională |
 | Deploy pe URL public | Neimplementat și neautorizat | Hosting confirmat, configurație, aprobare explicită de deploy și URL verificabil |
 
@@ -48,4 +48,4 @@ folosit ulterior trebuie să respecte D-001.
 ## Etape următoare
 
 Vezi [etapele și dependențele](P28-REQUIREMENTS.md#roadmap) și aprobările
-necesare pentru design, implementare, validarea reală și deploy.
+necesare pentru implementare, validarea reală și deploy.

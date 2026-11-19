@@ -10,7 +10,8 @@ M1 implements the technical foundation selected in D-003–D-005.
 The frontend has build tooling and a React entry rendering null; it has no visual UI.
 The backend exposes the health/documentation contract C-001. M2 adds a Docker CLI
 and minimal legal-entity ETL snapshots under C-002, with synthetic verification.
-Q-004 blocks visual UI; Q-005 blocks publication until complete real validation.
+Q-004 records the approved Draft 1 design for future UI implementation. Q-005
+blocks real publication until complete validation.
 
 ## Parts
 | Part | Path | Responsibility | Talks to |
@@ -24,7 +25,7 @@ Q-004 blocks visual UI; Q-005 blocks publication until complete real validation.
 | CI | .github/workflows/ci.yml | Same verification on PR and main push | Docker |
 | Agent instructions | AGENTS.md | Shared working rules | Knowledge ledger |
 | Knowledge ledger | docs/agents/ | Confirmed knowledge and open questions | Agent instructions |
-| Design documentation | docs/design/ | Guardrails and future design records | No visual UI yet |
+| Design documentation | docs/design/ | Guardrails and approved Draft 1 design references | No visual UI yet |
 | Claude workflows | .claude/ | Original plan/build skills and agents | Knowledge ledger |
 
 ## M1 runtime and M2 components

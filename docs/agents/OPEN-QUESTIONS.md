@@ -12,7 +12,7 @@
 - Q-001 · What application purpose, users, requirements and domain terms are confirmed? · _investigating_
 - Q-002 · Which application stack and Docker services should this project use? · _answered_
 - Q-003 · Which install, build, run, test and lint/type-check commands should verify the application? · _answered_
-- Q-004 · What UI, design tokens, viewport sizes and screenshot procedure are required?
+- Q-004 · What UI, design tokens, viewport sizes and screenshot procedure are required? · _answered_
 - Q-005 · Which public dataset and real versions can be approved? · _investigating_
 - Q-006 · What interview evidence and checkpoint rubric must be delivered? · _investigating_
 - Q-007 · Where and how should the public deployment run?
@@ -41,11 +41,9 @@
 - **Answer:** On 2026-11-17 the user approved D-004 and the M1 verification plan: Docker builds, Ruff, pytest unit and real-MySQL integration tests, frontend ESLint/type-check/build, ledger lint and Compose smoke checks. See ../../README.md for executable commands and scripts/verify.py for the complete check.
 
 ## Q-004 · What UI, design tokens, viewport sizes and screenshot procedure are required?
-- **Status:** open
-- **Blocks:** UI implementation, registry entries, mocks and screenshot verification.
+- **Status:** answered
 - **Who answers:** Project owner.
-- **Partial answer:** The owner reconfirmed D-002 and approved the proposed keyboard and narrow-screen acceptance workflow. D-015 specifies the main dashboard features. See [design guardrails](../design/DESIGN.md) and [acceptance criteria](../P28-REQUIREMENTS.md#acceptance-for-the-main-workflow).
-- **Still open:** Detailed screen and state design, token values, supported widths, screenshot procedure, and approval of each specific Figma version and matching local mock. The registry has no design entries yet.
+- **Answer:** On 2026-11-19 the project owner personally confirmed visual equivalence and approved all nine CompanyWatch Draft 1 screens under D-002. The approval applies to the screen designs, states and tokens represented in the pinned HTML mock and Figma review frames. Review the mock at 360, 768 and 1440 px in both themes, with the registered desktop and mobile Chromium captures as the visual references. Apply the documented keyboard and narrow-screen checks and agree on an application screenshot command in the implementation plan. [Design approval and review procedure](../design/DESIGN.md#etapa-d--registrul-onrc) · [Screen registry](../design/registry.yaml).
 
 ## Q-005 · Which public dataset and real versions can be approved?
 - **Status:** investigating
