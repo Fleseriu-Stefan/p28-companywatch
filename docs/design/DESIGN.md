@@ -92,8 +92,8 @@ before implementation. Any later visual revision repeats approval and local mock
 updates; edits in Figma do not automatically change the approved implementation basis.
 
 A design board is optional and is not required for approval. Do not create or publish
-one implicitly. No Figma link or integration is configured; using Figma as the selected
-design tool does not imply that Figma MCP access exists.
+one implicitly. The registry records the Figma references for individual drafts and
+approved screens. Verify access before using an integration.
 
 DS- IDs are for the tools (registry, mocks, board, Figma frames). Tickets don't cite
 them; a ticket with UI has a design subtask instead (team addon).
@@ -102,7 +102,7 @@ them; a ticket with UI has a design subtask instead (team addon).
 
 ## Source
 - Design board: none configured.
-- Figma: selected for design creation and visual approval (D-002); no file link or MCP integration configured.
+- Figma: design creation and visual approval under D-002. [Etapa D · Registrul ONRC](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl).
 - Token source for design: the approved Section D tokens below. The application has no visual token source yet.
 
 ## Tokens
@@ -319,6 +319,101 @@ None in visual component code; M1 has no visual components or styles.
 Codex follows D-002: create and visually approve designs in Figma, preserve the
 approved representations locally, and implement only their approved version.
 The original build workflow's requirement to use confirmed local mocks still applies.
-No Figma MCP access, board integration or publishing is configured or authorized by
-this documentation update. Report unavailable access; do not invent links or assume
-tool availability. Do not create or publish a board implicitly. See ../agents/CODEX.md.
+Use the Figma references and available access for the specific review. An optional
+design board requires separate authorization. [Codex workflow](../agents/CODEX.md).
+
+
+## Propunere pentru Etapa D · Registrul ONRC
+
+**Stare:** draft pentru evaluare vizuală. Propunerea lasă în vigoare tokenurile
+și regulile confirmate anterior până la o decizie explicită. D-002 cere
+aprobarea versiunii Figma și verificarea mockupului local corespunzător.
+[Deschide prototipul interactiv](mocks/registrul-onrc/index.html).
+
+### Schimbarea propusă
+
+```text
+PROPOSAL: change
+- Existing: Secțiunea Tokens consemnează paleta confirmată anterior.
+- Proposed: Adoptă noile tokenuri, lățimile de evaluare și referințele DS- către ecranele din prototipul comun.
+- Why now: Etapa D cere o identitate luminoasă și o căutare dominantă pentru fluxul ONRC.
+- Impact: DESIGN.md, registry.yaml, cele nouă ecrane draft și viitoarele componente React.
+- If approved: Păstrează paleta anterioară ca istoric și înregistrează referințele Figma, varianta și data aprobării.
+```
+
+Procedura D-002 se aplică fiecărui ecran. În această propunere, referința
+locală DS- include ruta ecranului din prototipul HTML comun.
+
+### Sistem de design propus
+
+| Rol | Luminos | Întunecat |
+| --- | --- | --- |
+| Fundal / suprafață / suprafață discretă | `#F1F5F9` / `#FFFFFF` / `#EAF0F6` | `#0C1622` / `#142233` / `#1B2E43` |
+| Text / text secundar | `#12273C` / `#496078` | `#E6EFF9` / `#ABC0D5` |
+| Separator / contur control / focus | `#D3DFEB` / `#71869C` / `#2167CC` | `#2E4560` / `#7690A9` / `#8ABAFF` |
+| Accent / selecție | `#17488C` / `#E1EDFB` | `#A7CFFF` / `#203C5C` |
+| Antet căutare / text antet / text secundar | `#102B4B` / `#FFFFFF` / `#C4D9ED` | `#162F4B` / `#F4F9FF` / `#C4D9ED` |
+| Focus pe antetul căutării | `#8ABAFF` | `#8ABAFF` |
+| Acțiune principală / text | `#086954` / `#FFFFFF` | `#8CE2C8` / `#0B332B` |
+| Pozitiv / avertisment / eroare, cu fundal | `#08614E` / `#DFF4EB`; `#825111` / `#FCEFD6`; `#9D3143` / `#FBE6EB` | `#A0E6CE` / `#153F37`; `#FFDA96` / `#483519`; `#FFBDC8` / `#482B37` |
+
+- Tipografie de lucru Inter dacă este disponibil local, cu fallback de sistem.
+  Monospace pentru CUI, EUID și endpointuri. Scara este 12, 14, 16, 19 și
+  24 px, cu H1 fluid între 32 și 60 px.
+- Spațiere pe o scară de 4, 8, 12, 16, 20, 24, 32, 40 și 48 px. Rază de
+  12 px pentru panouri și 8 px pentru controale. Ținte de minimum 44 px
+  pentru acțiunile principale. Tranziții de 140 ms și mișcare redusă la cerere.
+- La 1440 px, profilul și comparația firmei rămân alături de rezultate.
+  Sub 1088 px, coloanele principale se așază vertical. Sub 896 px, meniul
+  lateral se deschide din antet. Sub 640 px, perechile de ediții și rândurile
+  tabelelor se așază vertical, cu etichetele valorilor vizibile. Lățimi de
+  evaluare propuse 360, 768 și 1440 px.
+- Separarea vizuală pornește de la o căutare albastru închis și suprafețe deschise
+  pentru lucru. Rezultatele, profilul și comparația rămân în același ecran.
+  Indicatorii datasetului apar în Comparații, Analiză și Calitatea datelor.
+  Stările au etichete proprii și contur de focus vizibil. Graficele au valori,
+  unități și tabel echivalent. Selectarea barelor modifică datele grupate afișate.
+
+### Baza ecranelor și verificare
+
+| Flux | Bază confirmată |
+| --- | --- |
+| Căutare, profil și comparație pe pagina principală; comparație între ediții | D-007, D-008, D-015, C-002 |
+| Istoric observat și limitele interpretării | D-010 |
+| Analiză, agregare, export și vizualizări salvate | D-012, D-014, D-015 |
+| Calitatea datelor, ingestie și revizuirea schemei | D-008, D-011, D-013, C-002 |
+| API, documentarea sursei, chei și administrarea rolurilor | D-009, D-011, C-001 și Q-011 |
+
+Marcajul „Date sintetice” și controalele de stare și rol fac parte din
+prototipul de verificare. Datele de profil, numerele și agregatele provin din
+fixturile pentru diff și calitate, care reprezintă scenarii de test separate.
+Proveniența reală folosește catalogul ONRC și documentația proiectului. Rutele
+cu fragment de URL și acțiunile simulate nu stabilesc contractele aplicației.
+Valoarea cotelor API, calendarul ingestiei și rezultatele integrale reale
+rămân în întrebările deschise din ledger.
+[Fixturi ETL](../../backend/tests/etl_fixtures.py) ·
+[Verificări diff și calitate](../../backend/tests/test_etl_database.py) ·
+[Fișa datelor](../../DATA.md).
+
+### Referințe consultate
+
+- Ordinea identificatorilor, căutarea și proveniența în profil. [Termene.ro](https://termene.ro/produs-verificari-firme) · [OpenCorporates](https://opencorporates.com/)
+- Filtre lângă analiză, grafice cu detaliu tabelar și separarea rapoartelor de calitate de public. [Metabase](https://www.metabase.com/) · [OpenMetadata](https://open-metadata.org/)
+- Navigare grupată, controale predictibile și o ierarhie tipografică în care conținutul are prioritate. [shadcn/ui](https://ui.shadcn.com/blocks/dashboard) · [Linear](https://linear.app/now/behind-the-latest-design-refresh)
+
+
+### Pachet pentru aprobarea vizuală
+
+**Etapa D · Registrul ONRC · Draft 1** este identificat în registru prin nodurile
+Figma și capturile locale corespunzătoare. Cadrele de evaluare vizuală conțin
+capturile Chromium încorporate. Fișierul Figma include și un import editabil
+auxiliar, cu diferențe de redare a fonturilor și efectelor CSS. Cadrele de
+evaluare și mockupul HTML sunt perechea supusă aprobării D-002.
+
+- [Cadre Figma desktop](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=44-2) · [cadre mobile](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=41-2) · [stări ale căutării](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=42-2).
+- [Capturi locale desktop](screens/registrul-onrc/1440) · [mobil](screens/registrul-onrc/360) · [stări](screens/registrul-onrc/states).
+- [Registrul ecranelor](registry.yaml) asociază fiecare ecran cu tema, cadrul și captura.
+- Chromium a verificat cele nouă ecrane la 360, 768 și 1440 px, în ambele teme,
+  cu cinci stări per ecran. Comenzile de export și publicare demonstrează
+  interacțiunea folosind fixturi sintetice. Suita izolată `scripts/verify.py`
+  a trecut pentru proiectul existent.

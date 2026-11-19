@@ -13,3 +13,198 @@ designs:
       - name: Direcția 2
         design_ref: mocks/DS-CW-dashboard-v2.html
         figma_ref: https://www.figma.com/design/JQJkLRJU7hZGPSOFW2tTYq?node-id=28-2
+
+  # Etapa D · Registrul ONRC. Drafturi în așteptarea aprobării D-002.
+  - id: DS-CW-registru
+    kind: screen
+    name: Căutare, profil și comparația firmei
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#firme"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=44-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=44-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=64-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=41-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=63-2
+      loading: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=42-2
+      empty: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=45-2
+      error: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=48-2
+      success: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=51-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-registru.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-registru.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-registru.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-registru.dark.png
+    review_role: public
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
+  - id: DS-CW-istoric
+    kind: screen
+    name: Istoric observat al firmei
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#istoric"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=47-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=47-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=66-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=43-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=65-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-istoric.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-istoric.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-istoric.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-istoric.dark.png
+    review_role: public
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
+  - id: DS-CW-editii
+    kind: screen
+    name: Comparația edițiilor ONRC
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#editii"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=50-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=50-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=68-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=46-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=67-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-editii.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-editii.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-editii.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-editii.dark.png
+    review_role: public
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
+  - id: DS-CW-analiza
+    kind: screen
+    name: Analiză ONRC și export grupat
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#analiza"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=53-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=53-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=70-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=49-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=69-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-analiza.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-analiza.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-analiza.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-analiza.dark.png
+    review_role: public
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
+  - id: DS-CW-vizualizari
+    kind: screen
+    name: Vizualizări salvate
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#vizualizari"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=55-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=55-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=72-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=52-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=71-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-vizualizari.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-vizualizari.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-vizualizari.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-vizualizari.dark.png
+    review_role: public
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
+  - id: DS-CW-calitate
+    kind: screen
+    name: Calitatea datelor și ingestie
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#calitate"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=57-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=57-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=74-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=54-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=73-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-calitate.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-calitate.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-calitate.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-calitate.dark.png
+    review_role: curator
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
+  - id: DS-CW-schema
+    kind: screen
+    name: Revizuirea schemei
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#schema"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=59-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=59-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=76-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=56-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=75-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-schema.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-schema.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-schema.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-schema.dark.png
+    review_role: curator
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
+  - id: DS-CW-api
+    kind: screen
+    name: API și documentația sursei
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#api"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=60-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=60-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=78-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=58-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=77-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-api.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-api.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-api.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-api.dark.png
+    review_role: public
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
+  - id: DS-CW-acces
+    kind: screen
+    name: Administrarea utilizatorilor, rolurilor și cheilor
+    status: draft
+    design_ref: "mocks/registrul-onrc/index.html#acces"
+    figma_ref: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=62-2
+    figma_review: "Etapa D · Registrul ONRC · Draft 1"
+    figma_frames:
+      desktop_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=62-2
+      desktop_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=80-2
+      mobile_light: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=61-2
+      mobile_dark: https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=79-2
+    review_screens:
+      desktop_light: screens/registrul-onrc/1440/DS-CW-acces.light.png
+      desktop_dark: screens/registrul-onrc/1440/DS-CW-acces.dark.png
+      mobile_light: screens/registrul-onrc/360/DS-CW-acces.light.png
+      mobile_dark: screens/registrul-onrc/360/DS-CW-acces.dark.png
+    review_role: admin
+    states: [ready, loading, empty, error, success]
+    themes: [light, dark]
+    review_widths: [360, 768, 1440]
