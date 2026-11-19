@@ -15,6 +15,13 @@
 - D-006 · Approved ONRC development sources
 - D-007 · ONRC parsing, candidate identity and minimal legal-entity scope
 - D-008 · ETL version lifecycle, SQL diff and atomic publication
+- D-009 · Mandatory final project scope
+- D-010 · Observed company history
+- D-011 · Application roles and access boundaries
+- D-012 · Reproducible saved visualizations
+- D-013 · Schema review and publication
+- D-014 · Grouped ONRC aggregates
+- D-015 · Main dashboard and export semantics
 
 ---
 
@@ -83,3 +90,59 @@
 - **Why:** Incomplete or unapproved imports must not replace published data; M2 migrations supersede the test assumption that the database contains only the M1 baseline.
 - **Evidence:** User explicitly approved D-008, C-002 and the M2 implementation conditions, including evolution of M1 migration tests.
 - **Confirmed:** 2026-11-17
+
+## D-009 · Mandatory final project scope
+- **Status:** approved
+- **Date:** 2026-11-19
+- **Rule:** Deliver the mandatory P28 and general university requirements in [the requirements matrix](../P28-REQUIREMENTS.md). Preserve and reuse M1, M2 and M2.1. Exclude multi-year financial analysis from additional sources, fiscal/TVA checks, automatic notifications and commercial accounting-software integration. Add another dataset only if necessary for a mandatory requirement and explicitly approved.
+- **Why:** The project owner supplied the complete scope and chose to retain the baseline in D-005.
+- **Evidence:** [Section C decision review and scope](../P28-REQUIREMENTS.md#section-c-decision-review).
+- **Confirmed:** 2026-11-19
+
+## D-010 · Observed company history
+- **Status:** approved
+- **Date:** 2026-11-19
+- **Rule:** Resolve the latest published edition dated on or before the requested date. Query by EUID using validity intervals and show the selected edition date and source. Return unavailable before the earliest eligible edition. If the company is absent, report its absence from the selected snapshot. Infer no exact real-world change date.
+- **Why:** A dated export establishes an observed state and its source. Historical queries must exclude later observations.
+- **Evidence:** Section C question 7 and explicit approval of this documentation package. See [historical acceptance](../P28-REQUIREMENTS.md#acceptance-for-the-main-workflow).
+- **Confirmed:** 2026-11-19
+
+## D-011 · Application roles and access boundaries
+- **Status:** approved
+- **Date:** 2026-11-19
+- **Rule:** Serve visitors through protected read-only routes for published data, history, comparisons and saved visualizations, without visitor accounts or API keys. Require valid API keys, rate limits and quotas for the external API. Share query logic across both route sets. Require authenticated, server-side authorization for privileged actions. Curators run and review ingestion, approve mappings and publish validated editions. Administrators manage users, roles, API keys and permissions. Curators cannot grant themselves privileges or manage administrator permissions.
+- **Why:** The four roles need distinct access boundaries while public visitors must be able to use the dashboard without credentials.
+- **Evidence:** Section C questions 11 and 17 and explicit approval of this documentation package.
+- **Confirmed:** 2026-11-19
+
+## D-012 · Reproducible saved visualizations
+- **Status:** approved
+- **Date:** 2026-11-19
+- **Rule:** Authenticated curators and administrators can create and manage saved visualizations. Visitors can open stable links without write permission. Store filters, chart configuration and the exact published version or version pair. Resolve the latest published version at save time if none was selected. Keep the links and selected versions available after restarts and new publications until authorized deletion.
+- **Why:** A shared visualization should keep displaying the data selection it was created with.
+- **Evidence:** Section C questions 12 and 13 and explicit approval of this documentation package.
+- **Confirmed:** 2026-11-19
+
+## D-013 · Schema review and publication
+- **Status:** approved
+- **Date:** 2026-11-19
+- **Rule:** Record each version's source schema and explicit canonical mapping. Display detected differences, including old and new column names, and suggest only mappings supported by evidence. Curators explicitly resolve ambiguous required mappings, review or correct suggestions, and approve the mapping. Publication stays blocked until required mappings are resolved, validation succeeds and the curator approves publication under D-008. Earlier published versions stay immutable and queryable.
+- **Why:** Schema changes must undergo explicit review and must preserve previously published data.
+- **Evidence:** Section C question 10 and explicit approval of this documentation package.
+- **Confirmed:** 2026-11-19
+
+## D-014 · Grouped ONRC aggregates
+- **Status:** approved
+- **Date:** 2026-11-19
+- **Rule:** COUNT company rows by published edition and legal form. SUM accepted and quarantined records separately by edition using one selected published report per edition. Report intentional exclusions separately. AVG the equally weighted per-edition rates `quarantined_records / source_records` for selected editions of the ONRC dataset. Missing counts remain unavailable. Omit missing inputs and zero denominators from AVG and return null when none qualify. Preserve measured zeroes. Use only verified fields and ETL metrics.
+- **Why:** Existing company rows and quality reports supply meaningful aggregates without duplicate counts from idempotent runs.
+- **Evidence:** Section C question 6 and explicit approval of the resulting aggregate definitions.
+- **Confirmed:** 2026-11-19
+
+## D-015 · Main dashboard and export semantics
+- **Status:** approved
+- **Date:** 2026-11-19
+- **Rule:** Keep search by verified name or CUI, company selection, profile and edition comparison on the main page. Offer verified legal form, county and locality filters, plus edition and applicable change-type filters for comparisons. CSV and XLSX export all matching results using the active filters, sort, editions and view. Include identifier, change type, edition references and previous/current values for comparisons. Export grouped rows for aggregate views and identify unavailable values in both formats.
+- **Why:** The main page supports the accountant's preliminary partner check. Both export formats must represent the same selected data across pagination.
+- **Evidence:** Section C questions 2–4 and 14–16 and explicit approval of this documentation package. See [main workflow acceptance](../P28-REQUIREMENTS.md#acceptance-for-the-main-workflow).
+- **Confirmed:** 2026-11-19

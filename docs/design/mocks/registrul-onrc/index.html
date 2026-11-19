@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ro" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>CompanyWatch · Registrul ONRC · Etapa D</title>
+  <link rel="stylesheet" href="design.css">
+  <script src="prototype.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#workspace">Sari la conținut</a>
+  <form class="review" aria-label="Instrumente de verificare a mockupului">
+    <strong>Etapa D <span>· Date sintetice</span></strong>
+    <label>
+      <span class="review-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/></svg>Perspectivă</span>
+      <select id="role"><option value="visitor">Vizitator</option><option value="curator">Curator</option><option value="admin">Administrator</option></select>
+    </label>
+    <label>
+      <span class="review-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-6 4 12 3-6h4"/></svg>Stare</span>
+      <select id="state"><option value="ready">Cu date</option><option value="loading">Încărcare</option><option value="empty">Fără date</option><option value="error">Eroare</option><option value="success">Succes</option></select>
+    </label>
+    <label>
+      <span class="review-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 15a8.5 8.5 0 0 1-11.5-11.5A8.5 8.5 0 1 0 20.5 15Z"/></svg>Temă</span>
+      <select id="theme"><option value="light">Luminoasă</option><option value="dark">Întunecată</option></select>
+    </label>
+  </form>
+  <div class="shell" id="capture">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#firme"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><span>CompanyWatch<small>Registrul ONRC</small></span></a>
+      <nav id="navigation" aria-label="Navigare principală"></nav>
+      <div class="credits"><strong>Sursa datelor</strong><span>ONRC · OD_FIRME.CSV</span><a href="../../../../DATA.md">Proveniență și licență ↗</a></div>
+    </aside>
+    <div class="main">
+      <header class="top"><div><button class="mobile" type="button" id="menu" aria-controls="sidebar" aria-expanded="false">☰ <span>Meniu</span></button><span id="location"></span></div><a class="mobile mobile-brand" href="#firme">CompanyWatch</a><span class="context" id="context"></span></header>
+      <main id="workspace" tabindex="-1"></main>
+    </div>
+  </div>
+  <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+  <div id="feedback" role="status" class="notification" hidden></div>
+</body>
+</html>

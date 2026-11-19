@@ -1,7 +1,8 @@
 # CompanyWatch — ce lipsește pentru checkpoint
 
-Acest document urmărește cerințele comunicate de utilizator. Nu reprezintă o
-confirmare a întregii grile a profesorului; grila completă nu a fost furnizată.
+Acest document păstrează stadiul inițial M1 și M2. Cerințele obligatorii confirmate
+de proprietarul proiectului, matricea și etapele actuale sunt în
+[P28-REQUIREMENTS.md](P28-REQUIREMENTS.md).
 M1 este integrat în `main`, la `c5c0b71`. Baza M1 a rămas la revizia
 `0001_baseline` pe volumul original la verificarea M2. M2 este integrat în
 `main`, la `b8a2b6f`. Verificările CI pe `main` au trecut pentru ambele
@@ -19,8 +20,8 @@ milestone-uri. Rularea locală completă M2 a trecut 46 de teste cu date sinteti
 | Rapoarte de calitate | Implementate; rezultate sintetice | Rapoarte complete pe cele două exporturi reale |
 | Diff calculat în SQL | Implementat și testat pe MySQL izolat | Rezultatul pentru versiunile reale publicate manual |
 | Detectarea schimbărilor de schemă | Profil strict și blocare implementate | Validarea profilului pe întregul export și review la schimbări |
-| Dashboard interactiv | Blocat de aprobarea designului | Cerințe, versiune Figma aprobată, mock-uri locale, tokens și screenshots |
-| Interviu | Nerealizat în acest repository; fără rezultate furnizate | Cerința exactă, interviu real și concluzii bazate pe dovezi |
+| Dashboard interactiv | Etapa D încheiată cu aprobarea celor nouă ecrane Draft 1, conform D-002 | Plan de implementare aprobat, dashboard funcțional și verificare vizuală față de [designul aprobat](design/DESIGN.md#etapa-d--registrul-onrc) |
+| Interviu | Rezumatul interviului real este în [INTERVIEW.md](../INTERVIEW.md). Auditul Secțiunii C este aprobat. | Feedback real după demonstrația funcțională |
 | Deploy pe URL public | Neimplementat și neautorizat | Hosting confirmat, configurație, aprobare explicită de deploy și URL verificabil |
 
 ## ONRC
@@ -33,10 +34,10 @@ Nu există rezultate de import real, checksum-uri integrale sau diff real invent
 
 ## Interviu
 
-Nu există răspunsuri sau rezultate de interviu. Trebuie confirmate formatul și
-cerința profesorului, apoi realizat și documentat interviul real (Q-006).
-Nu se introduc date personale în repository; forma dovezilor trebuie să respecte
-regulile proiectului.
+[INTERVIEW.md](../INTERVIEW.md) documentează problema recurentă descrisă de
+contabil. Proprietarul proiectului a confirmat scopul și scenariul propus pentru
+demonstrație. Validarea scenariului de către contabil și feedbackul său rămân
+deschise în [Q-006](agents/OPEN-QUESTIONS.md#q-006--what-interview-evidence-and-checkpoint-rubric-must-be-delivered).
 
 ## Publicare
 
@@ -44,14 +45,7 @@ Adresa locală din README nu este un URL public. CI verifică aplicația și nu 
 publică. Alegerea hostingului și aprobarea deploy-ului rămân Q-007. Orice server
 folosit ulterior trebuie să respecte D-001.
 
-## Ordine propusă pentru etapele viitoare
+## Etape următoare
 
-1. Confirmarea grilei profesorului și a livrabilului de interviu.
-2. Autorizarea importului integral și validarea celor două ediții ONRC.
-3. Verificarea rapoartelor de calitate și a diff-ului SQL pe edițiile reale,
-   după aprobarea publicării lor.
-4. Aprobarea designului Figma și a procedurii de verificare UI.
-5. Implementarea și verificarea fluxului complet.
-6. Aprobarea și efectuarea unui deploy public.
-
-Această ordine este o propunere de lucru viitor, nu autorizare de implementare.
+Vezi [etapele și dependențele](P28-REQUIREMENTS.md#roadmap) și aprobările
+necesare pentru implementare, validarea reală și deploy.
