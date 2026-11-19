@@ -42,7 +42,8 @@ button:disabled {opacity:.64;cursor:default}
 h1,h2,h3,p {margin:0;overflow-wrap:anywhere}
 h1 {font-size:var(--title);letter-spacing:-.045em;line-height:1.06;font-weight:760}
 h2 {font-size:var(--xl);line-height:1.2;letter-spacing:-.025em}
-h3 {font-size:var(--lg);line-height:1.25}
+h3,.state>.notice-heading {font-size:var(--lg);line-height:1.25}
+.state>.notice-heading {letter-spacing:normal}
 small,.small {font-size:var(--sm)}
 .muted {color:var(--muted)}
 .mono {font-family:var(--mono);font-size:var(--sm);overflow-wrap:anywhere}
