@@ -404,16 +404,22 @@ rămân în întrebările deschise din ledger.
 
 ### Pachet pentru aprobarea vizuală
 
-**Etapa D · Registrul ONRC · Draft 1** este identificat în registru prin nodurile
-Figma și capturile locale corespunzătoare. Cadrele de evaluare vizuală conțin
-capturile Chromium încorporate. Fișierul Figma include și un import editabil
-auxiliar, cu diferențe de redare a fonturilor și efectelor CSS. Cadrele de
-evaluare și mockupul HTML sunt perechea supusă aprobării D-002.
+**Etapa D · Registrul ONRC · Draft 1** folosește bara laterală originală și
+controalele „Perspectivă”, „Stare” și „Temă” alese pentru antet. La lățimi mici,
+butonul „Meniu” deschide aceeași navigare. Aprobarea D-002 așteaptă confirmarea
+vizuală a proprietarului proiectului.
+
+Cele 40 de cadre de referință din același fișier Figma conțin capturile Chromium
+din depozit, verificate după amprenta imaginii și dimensiunile cadrului. Setul
+acoperă cele nouă ecrane la 360 și 1440 px în ambele teme și patru stări ale
+căutării pe desktop luminos. La 768 px și pentru interacțiunile cu meniul și
+controalele se folosește prototipul HTML. Importul editabil auxiliar din Figma
+reflectă un import anterior, cu antetul de verificare absent și diferențe de
+fonturi și efecte CSS. Confirmarea vizuală se face pe cadrele de referință Chromium.
 
 - [Cadre Figma desktop](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=44-2) · [cadre mobile](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=41-2) · [stări ale căutării](https://www.figma.com/design/yU5n5lYExD2GhB9zlCaddl?node-id=42-2).
 - [Capturi locale desktop](screens/registrul-onrc/1440) · [mobil](screens/registrul-onrc/360) · [stări](screens/registrul-onrc/states).
 - [Registrul ecranelor](registry.yaml) asociază fiecare ecran cu tema, cadrul și captura.
-- Chromium a verificat cele nouă ecrane la 360, 768 și 1440 px, în ambele teme,
-  cu cinci stări per ecran. Comenzile de export și publicare demonstrează
-  interacțiunea folosind fixturi sintetice. Suita izolată `scripts/verify.py`
-  a trecut pentru proiectul existent.
+- Chromium 153 a verificat 270 de combinații pentru cele nouă ecrane la 360,
+  768 și 1440 px, în ambele teme și în cinci stări, plus navigarea, accesul pe
+  roluri, căutarea, exportul simulat și confirmarea revizuirii mapării.

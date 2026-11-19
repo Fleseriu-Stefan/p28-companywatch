@@ -50,7 +50,45 @@ small,.small {font-size:var(--sm)}
 .review strong {margin-right:auto}
 .review strong span {color:var(--muted);font-weight:500}
 .review label {display:flex;align-items:center;gap:var(--s2)}
-.review select {font-size:var(--xs)}
+.review-label {display:inline-flex;align-items:center;gap:var(--s1);color:var(--muted);font-weight:650}
+.review-label .icon {width:var(--s3);height:var(--s3);color:var(--accent)}
+.review select {
+  font-size:var(--xs);font-weight:650;line-height:1.25;
+  box-shadow:var(--shadow);
+  transition:background var(--transition),border-color var(--transition),box-shadow var(--transition);
+}
+.review select:hover {border-color:var(--accent);background:var(--canvas)}
+.review select:active {background:var(--accent-soft)}
+.review select:focus-visible {outline-offset:2px}
+@supports (appearance:base-select) and selector(::picker(select)) {
+  .review select,.review select::picker(select) {appearance:base-select}
+  .review select {align-items:center;gap:var(--s2)}
+  .review select::picker-icon {
+    content:"";width:.375rem;height:.375rem;flex:none;
+    border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    color:var(--muted);transform:translateY(-25%) rotate(45deg);transition:transform var(--transition);
+  }
+  .review select:open {border-color:var(--accent);background:var(--accent-soft)}
+  .review select:open::picker-icon {color:var(--accent);transform:translateY(25%) rotate(225deg)}
+  .review select::picker(select) {
+    margin-block:var(--s1);padding:var(--s1);border:1px solid var(--line);
+    border-radius:var(--radius-control);background:var(--surface);color:var(--text);
+    box-shadow:var(--shadow),0 var(--s2) var(--s4) color-mix(in srgb,var(--overlay) 30%,transparent);
+  }
+  .review select:open::picker(select) {animation:review-picker-in 140ms ease}
+  .review option {
+    gap:var(--s2);min-height:var(--hit);padding:var(--s2);
+    border-radius:var(--radius-control);font-weight:550;
+  }
+  .review option:checked {background:var(--accent-soft);color:var(--accent);font-weight:700}
+  .review option:hover,.review option:focus-visible {background:var(--inset)}
+  .review option:focus-visible {outline-offset:-3px}
+  .review option::checkmark {order:1;margin-inline-start:auto;color:var(--accent)}
+  @keyframes review-picker-in {
+    from {opacity:0;transform:translateY(calc(-1 * var(--s1)))}
+    to {opacity:1;transform:translateY(0)}
+  }
+}
 .shell {min-height:calc(100vh - 61px);display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr)}
 .sidebar {background:var(--surface);border-right:1px solid var(--line);padding:var(--s6) var(--s4);display:flex;flex-direction:column;gap:var(--s8)}
 .brand {display:flex;gap:var(--s3);align-items:center;color:var(--text);text-decoration:none;font-weight:770;letter-spacing:-.035em}
@@ -160,6 +198,11 @@ dialog::backdrop {background:var(--overlay)}
   .top {position:sticky;top:0;z-index:2}
   .mobile {display:inline-flex;align-items:center;gap:var(--s2)}
 }
+@media (40rem < width <= 56rem) {
+  .review {column-gap:var(--s2)}
+  .review label {gap:var(--s1)}
+  .review select {padding-inline:var(--s2)}
+}
 @media(max-width:40rem) {
   .review {justify-content:flex-start;padding-inline:var(--s4)}
   .review strong {flex-basis:100%}
@@ -184,10 +227,10 @@ dialog::backdrop {background:var(--overlay)}
 main:focus-visible {outline-offset:-3px}
 @media(max-width:40rem) {
   .mobile-brand {display:inline-flex}
-  .review {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s2)}
+  .review {display:grid;grid-template-columns:minmax(0,1.2fr) repeat(2,minmax(0,1fr));gap:var(--s2)}
   .review strong {grid-column:1/-1}
   .review label {display:grid;gap:var(--s1)}
-  .review select {width:100%;min-width:0;padding-inline:var(--s1)}
+  .review select {width:100%;min-width:0;gap:var(--s1);padding-inline:var(--s1)}
 }
 @media(max-width:23.5rem) {
   .top #location {display:none}

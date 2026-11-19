@@ -14,7 +14,8 @@ designs:
         design_ref: mocks/DS-CW-dashboard-v2.html
         figma_ref: https://www.figma.com/design/JQJkLRJU7hZGPSOFW2tTYq?node-id=28-2
 
-  # Etapa D · Registrul ONRC. Drafturi în așteptarea aprobării D-002.
+  # Etapa D · Registrul ONRC · Draft 1. Referințele Figma conțin capturile
+  # Chromium actualizate. Aprobarea D-002 așteaptă confirmarea proprietarului.
   - id: DS-CW-registru
     kind: screen
     name: Căutare, profil și comparația firmei
@@ -36,6 +37,10 @@ designs:
       desktop_dark: screens/registrul-onrc/1440/DS-CW-registru.dark.png
       mobile_light: screens/registrul-onrc/360/DS-CW-registru.light.png
       mobile_dark: screens/registrul-onrc/360/DS-CW-registru.dark.png
+      loading: screens/registrul-onrc/states/DS-CW-registru.light.loading.png
+      empty: screens/registrul-onrc/states/DS-CW-registru.light.empty.png
+      error: screens/registrul-onrc/states/DS-CW-registru.light.error.png
+      success: screens/registrul-onrc/states/DS-CW-registru.light.success.png
     review_role: public
     states: [ready, loading, empty, error, success]
     themes: [light, dark]

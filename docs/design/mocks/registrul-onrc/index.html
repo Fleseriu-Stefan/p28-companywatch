@@ -12,9 +12,18 @@
   <a class="skip" href="#workspace">Sari la conținut</a>
   <form class="review" aria-label="Instrumente de verificare a mockupului">
     <strong>Etapa D <span>· Date sintetice</span></strong>
-    <label>Perspectivă <select id="role"><option value="visitor">Vizitator</option><option value="curator">Curator</option><option value="admin">Administrator</option></select></label>
-    <label>Stare <select id="state"><option value="ready">Cu date</option><option value="loading">Încărcare</option><option value="empty">Fără date</option><option value="error">Eroare</option><option value="success">Succes</option></select></label>
-    <label>Temă <select id="theme"><option value="light">Luminoasă</option><option value="dark">Întunecată</option></select></label>
+    <label>
+      <span class="review-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/></svg>Perspectivă</span>
+      <select id="role"><option value="visitor">Vizitator</option><option value="curator">Curator</option><option value="admin">Administrator</option></select>
+    </label>
+    <label>
+      <span class="review-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-6 4 12 3-6h4"/></svg>Stare</span>
+      <select id="state"><option value="ready">Cu date</option><option value="loading">Încărcare</option><option value="empty">Fără date</option><option value="error">Eroare</option><option value="success">Succes</option></select>
+    </label>
+    <label>
+      <span class="review-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 15a8.5 8.5 0 0 1-11.5-11.5A8.5 8.5 0 1 0 20.5 15Z"/></svg>Temă</span>
+      <select id="theme"><option value="light">Luminoasă</option><option value="dark">Întunecată</option></select>
+    </label>
   </form>
   <div class="shell" id="capture">
     <aside class="sidebar" id="sidebar">
