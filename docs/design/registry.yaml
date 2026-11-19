@@ -1,4 +1,13 @@
 # Screens and shared components are added only from confirmed requirements.
+# The original Draft 1 approval remains pinned per screen below. The approved
+# corrections to the shared prototype need their own commit before a corrected
+# mock revision can be pinned here.
+approved_prototype_correction:
+  approved_on: "2026-11-19"
+  design_ref: mocks/registrul-onrc/index.html
+  applies_to: [DS-CW-registru, DS-CW-istoric, DS-CW-editii, DS-CW-analiza, DS-CW-vizualizari, DS-CW-calitate, DS-CW-schema, DS-CW-api, DS-CW-acces]
+  original_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
+  evidence_ref: DESIGN.md#corecții-aprobate-pentru-prototipul-etapei-d
 designs:
   - id: DS-CW-dashboard
     kind: screen

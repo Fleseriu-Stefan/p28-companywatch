@@ -42,9 +42,10 @@ const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="
 const $ = selector => document.querySelector(selector);
 const workspace = $('#workspace');
 const dialog = $('#dialog');
-const state = {query:'', id:50, form:'', county:'', locality:'', sort:'asc', old:0, current:1, change:'', all:false, date:'2026-11-04', metric:'form', group:'', edition:1, access:'users'};
+const state = {query:'', draftQuery:'', id:50, form:'', county:'', locality:'', sort:'asc', old:0, current:1, change:'', all:false, date:'2026-11-04', metric:'form', group:'', edition:1, access:'users'};
 let saved = null;
 let qualityReviewed = false;
+let qualityDisclosureOpen = true;
 let mappingReviewed = false;
 let feedbackTimer;
 const clean = value => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
@@ -60,7 +61,7 @@ const head = (title, description, action='') => `<div class="page-head"><div><h1
 const sectionHead = (title, description='', action='') => `<div class="section-head"><div><h2>${title}</h2>${description?`<p class="muted small">${description}</p>`:''}</div>${action}</div>`;
 const table = (columns, rows) => `<table class="table" role="table"><thead role="rowgroup"><tr role="row">${columns.map(column=>`<th role="columnheader" scope="col">${column}</th>`).join('')}</tr></thead><tbody role="rowgroup">${rows.map(row=>`<tr role="row">${row.map((cell,index)=>`<td role="cell" data-label="${columns[index]}">${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 const metric = (label,value) => `<div class="metric"><span class="small">${label}</span><b>${value}</b></div>`;
-const source = i => `<a href="${sourceLinks[i]}">Sursă ONRC ↗</a>`;
+const source = i => `<a href="${sourceLinks[i]}" aria-label="Sursă ONRC — ediția ${editions[i]}">Sursă ONRC ↗</a>`;
 const variant = () => $('#state').value;
 const editionOptions = editions.map((date, index) => [index,date]);
 
@@ -72,25 +73,25 @@ function pair() {
   </div>`;
 }
 
-function pairBody(content) {
+function pairBody(content, heading='h3') {
   if (state.old >= state.current) {
-    return notice('error','Alege două ediții distincte','Selectează ediția mai veche în primul câmp.');
+    return notice('error','Alege două ediții distincte','Selectează ediția mai veche în primul câmp.','',heading);
   }
   return content;
 }
 
-function notice(kind, title, detail, action='') {
+function notice(kind, title, detail, action='', heading='h3') {
   const role = kind==='error'?'alert':'status';
   const skeleton = kind==='loading'?'<div class="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>':'';
-  return `<div class="state ${kind}" role="${role}" ${kind==='loading'?'aria-busy="true"':''}><h3>${title}</h3><p>${detail}</p>${skeleton}${action}</div>`;
+  return `<div class="state ${kind}" role="${role}" ${kind==='loading'?'aria-busy="true"':''}><${heading} class="notice-heading">${title}</${heading}><p>${detail}</p>${skeleton}${action}</div>`;
 }
 
-function loadable(content, noun, emptyDetail='Revino după ce sunt disponibile date pentru această selecție.') {
+function loadable(content, noun, emptyDetail='Revino după ce sunt disponibile date pentru această selecție.', heading='h2') {
   switch (variant()) {
-    case 'loading': return notice('loading','Se încarcă…',`Se încarcă ${noun}.`);
-    case 'empty': return notice('empty','Nu sunt date disponibile',emptyDetail,'<button data-action="reset">Revino la selecția inițială</button>');
-    case 'error': return notice('error','Încărcarea a eșuat',`Reîncearcă încărcarea pentru ${noun}.`,'<button data-action="retry">Reîncearcă</button>');
-    case 'success': return notice('success','Date actualizate',`Sunt disponibile ${noun} pentru selecția curentă.`)+content;
+    case 'loading': return notice('loading','Se încarcă…',`Se încarcă ${noun}.`,'',heading);
+    case 'empty': return notice('empty','Nu sunt date disponibile',emptyDetail,'<button data-action="reset">Revino la selecția inițială</button>',heading);
+    case 'error': return notice('error','Încărcarea a eșuat',`Reîncearcă încărcarea pentru ${noun}.`,'<button data-action="retry">Reîncearcă</button>',heading);
+    case 'success': return notice('success','Date actualizate',`Sunt disponibile ${noun} pentru selecția curentă.`,'',heading)+content;
     default: return content;
   }
 }
@@ -127,11 +128,11 @@ function dashboard() {
     <h1>Caută o firmă</h1><p>Consultă profilul ONRC și vezi ce s-a schimbat între ediții.</p>
     <form class="search-form" id="search-form">
       <label for="query">Denumire sau CUI</label>
-      <div class="search-row"><input id="query" name="q" type="search" placeholder="Scrie denumirea sau CUI" value="${clean(state.query)}"><button class="primary">Caută în registru</button></div>
+      <div class="search-row"><input id="query" name="q" type="search" placeholder="Scrie denumirea sau CUI" value="${clean(state.draftQuery)}"><button class="primary">Caută în registru</button></div>
     </form>
   </section>`;
   const detail = selected ? companyProfile(selected) : '';
-  return hero+`<div class="columns">${panel(sectionHead('Rezultatele căutării','',exportButton)+publicFilters()+loadable(results,'rezultatele căutării','Încearcă o altă denumire, un CUI sau alte filtre.'))}
+  return hero+`<div class="columns">${panel(sectionHead('Rezultatele căutării','',exportButton)+publicFilters()+loadable(results,'rezultatele căutării','Încearcă o altă denumire, un CUI sau alte filtre.','h3'))}
     <div class="stack">${['ready','success'].includes(variant())?detail:''}</div></div>`;
 }
 
@@ -165,7 +166,7 @@ function observedHistory() {
   else observed=`<div class="row"><span class="tag good">● Prezentă în ediție</span><span class="small">${editions[index]} · ${source(index)}</span></div>
     <dl class="dl">${info('Denumire',index===0&&company.id===51?company.before:name(company))}${info('CUI',cui(company))}${info('EUID',euid(company))}${info('Localitate',locality)}</dl>`;
   return head('Istoric observat','Consultă starea firmei în ultima ediție publicată până la data cerută.',`<a class="button" href="#firme?firma=${company.id}">← Profilul firmei</a>`)+
-    panel(sectionHead(name(company),euid(company))+`<form class="filters" id="history-form"><label>Data cerută <input id="date" type="date" value="${state.date}" required></label><button class="primary">Consultă ediția</button></form>`+loadable(observed,'starea observată'));
+    panel(sectionHead(name(company),euid(company))+`<form class="filters" id="history-form"><label>Data cerută <input id="date" type="date" value="${state.date}" required></label><button class="primary">Consultă ediția</button></form>`+loadable(observed,'starea observată',undefined,'h3'));
 }
 
 function comparisons() {
@@ -179,7 +180,7 @@ function comparisons() {
   return head('Compară edițiile ONRC','Explorează schimbările observate între două ediții publicate.',exportButton)+panel(pair())+
     loadable(pairBody(`<div class="cover" aria-label="Filtre după tipul schimbării">${cards}</div>`+
       panel(sectionHead('Schimbări în registru','Eliminarea indică absența din ediția curentă.',state.change?'<button data-change="">Toate schimbările</button>':'')+publicFilters()+
-      (rows.length?table(['Firmă','Schimbare','Câmp',editions[state.old],editions[state.current]],rows):notice('empty','Nicio schimbare în selecție','Ajustează filtrele pentru a vedea alte rezultate.')))),'schimbările între ediții');
+      (rows.length?table(['Firmă','Schimbare','Câmp',editions[state.old],editions[state.current]],rows):notice('empty','Nicio schimbare în selecție','Ajustează filtrele pentru a vedea alte rezultate.'))),'h2'),'schimbările între ediții');
 }
 
 const metrics = [
@@ -233,7 +234,7 @@ function quality() {
         table(['Rezultat','Rânduri'],[['Acceptate',3],['În carantină',4],['Excluse intenționat',1]])+
         '<a class="button" href="#schema">Revizuiește schema →</a>')}
       ${panel(sectionHead('Anomalii și publicare','Comparație cu ediția 19.10.2026')+
-        '<details open><summary>Semnale din comparația de calitate</summary><ul><li>Au apărut înregistrări duplicate.</li><li>Rândurile acceptate au scăzut de la 5 la 3.</li></ul></details>'+
+        `<details id="quality-anomalies"${qualityDisclosureOpen?' open':''}><summary>Semnale din comparația de calitate</summary><ul><li>Au apărut înregistrări duplicate.</li><li>Rândurile acceptate au scăzut de la 5 la 3.</li></ul></details>`+
         `<p class="muted small">Publicarea necesită revizuirea raportului, aprobarea mapării și aprobarea versiunii validate.</p><div class="row"><button data-action="review">Revizuiește raportul</button><button data-action="publish" ${qualityReviewed&&mappingReviewed?'':'disabled'}>Publică ediția</button></div>`)}
     </div>`;
   return head('Calitatea datelor','Revizuiește ingestia, rezultatele validării și starea publicării.')+loadable(report,'rapoartele de ingestie','Rapoartele apar după prima încercare de ingestie.');
@@ -260,7 +261,7 @@ function access() {
   return head('Administrare acces','Gestionează utilizatorii, rolurile și accesul la API.')+
     panel(`<div class="row"><button data-access="users" aria-pressed="${!keyView}">Utilizatori și roluri</button><button data-access="keys" aria-pressed="${keyView}">Chei API</button></div>
       ${loadable(keyView
-        ? notice('empty','Nicio cheie API în această previzualizare','Cheile, ratele și cotele vor fi gestionate după integrarea API-ului extern.','<button data-action="keys">Vezi accesul API</button>')
+        ? notice('empty','Nicio cheie API în această previzualizare','Cheile, ratele și cotele vor fi gestionate după integrarea API-ului extern.','<button data-action="keys">Vezi accesul API</button>','h2')
         : sectionHead('Roluri disponibile','Accesul privilegiat necesită autentificare.')+table(['Rol','Drepturi'],[['Curator','Revizuiește ingestia și maparea. Aprobă și publică ediții validate.'],['Administrator','Gestionează utilizatori, roluri, chei API și permisiuni.']])+
           '<button data-action="roles">Vezi drepturile rolurilor</button>','datele de administrare')}`);
 }
@@ -291,7 +292,7 @@ function render(restoreFocus=false, readCompany=false) {
   $('#context').textContent=`ONRC · ${roleLabels[role]}`;
   workspace.innerHTML=visible.some(([key])=>key===page)
     ? renderPage[page]()
-    : head('Acces restricționat','Această secțiune necesită un rol autorizat.')+notice('error','Drepturi insuficiente','Perspectiva selectată nu are acces la această secțiune.','<a class="button" href="#firme">Revino la căutare</a>');
+    : head('Acces restricționat','Această secțiune necesită un rol autorizat.')+notice('error','Drepturi insuficiente','Perspectiva selectată nu are acces la această secțiune.','<a class="button" href="#firme">Revino la căutare</a>','h2');
   document.title=`${pages[page][1]} · CompanyWatch`;
   if (restoreFocus) {
     if (focused?.id && workspace.contains($('#'+focused.id))) $('#'+focused.id).focus();
@@ -348,7 +349,10 @@ dialog.addEventListener('close',()=>{
     render(true);
     feedback('Confirmare de publicare afișată în previzualizare.');
   } else {
-    if(dialog.dataset.action==='review') qualityReviewed=true;
+    if(dialog.dataset.action==='review') {
+      qualityDisclosureOpen=$('#quality-anomalies')?.open??qualityDisclosureOpen;
+      qualityReviewed=true;
+    }
     if(dialog.dataset.action==='mapping') mappingReviewed=true;
     render(true);
     feedback('Revizuire confirmată în previzualizare.');
@@ -367,9 +371,16 @@ document.addEventListener('change',event=>{
   }
 });
 
+workspace.addEventListener('input',event=>{
+  if(event.target.id==='query') state.draftQuery=event.target.value;
+});
+
 workspace.addEventListener('submit',event=>{
   event.preventDefault();
-  if(event.target.id==='search-form') state.query=$('#query').value;
+  if(event.target.id==='search-form') {
+    state.draftQuery=$('#query').value;
+    state.query=state.draftQuery;
+  }
   if(event.target.id==='history-form') state.date=$('#date').value;
   render(true);
 });
@@ -386,7 +397,7 @@ workspace.addEventListener('click',event=>{
   else if(access) state.access=access;
   else if(action==='retry') $('#state').value='ready';
   else if(action==='reset') {
-    Object.assign(state,{query:'',form:'',county:'',locality:'',sort:'asc',change:'',group:'',old:0,current:1});
+    Object.assign(state,{query:'',draftQuery:'',form:'',county:'',locality:'',sort:'asc',change:'',group:'',old:0,current:1});
     $('#state').value='ready';
   } else if(action in dialogData) {
     openDialog(action);

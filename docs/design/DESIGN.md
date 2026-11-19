@@ -330,6 +330,25 @@ Figma de evaluare și mockupul HTML, conform D-002. Fiecare intrare DS- din
 registru identifică ruta ecranului, cadrele Figma și revizia mockupului aprobat.
 [Prototip interactiv](mocks/registrul-onrc/index.html) · [Revizia aprobată](https://github.com/Fleseriu-Stefan/p28-companywatch/tree/2dc3bf2c6823ca733bc8d4b045a4dea241055106/docs/design/mocks/registrul-onrc).
 
+### Corecții aprobate pentru prototipul Etapei D
+
+La 2026-11-19, proprietarul a inspectat personal în browser prototipul corectat
+și a aprobat cele patru remedieri selectate anterior. Căutarea păstrează textul
+nestrimis când se schimbă sortarea; secțiunea cu semnalele de calitate rămâne
+închisă după confirmarea revizuirii; mesajele de stare folosesc nivelul corect
+de titlu; iar legăturile către sursa ONRC disting ediția în numele accesibil.
+Proprietarul a confirmat și navigarea, ambele teme și aspectul vizual corectat.
+
+Evidența corecțiilor cuprinde **24 de verificări de interacțiune trecute** și
+comparații în browser. Modificările locale sunt numai în
+[`prototype.js`](mocks/registrul-onrc/prototype.js) și
+[`design.css`](mocks/registrul-onrc/design.css); cele nouă ecrane, referințele
+Figma și cele 40 de capturi de referință rămân păstrate. Revizia originală
+aprobată `2dc3bf2c6823ca733bc8d4b045a4dea241055106` rămâne referința
+istorică. Registrul consemnează aprobarea corecțiilor, dar identificatorul Git
+al prototipului corectat va fi adăugat numai după commitul autorizat al acestor
+fișiere. D-002 și răspunsul Q-004 rămân nemodificate.
+
 ### Sistem de design aprobat pentru cele nouă ecrane
 
 | Rol | Luminos | Întunecat |
