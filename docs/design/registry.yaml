@@ -7,6 +7,7 @@ approved_prototype_correction:
   design_ref: mocks/registrul-onrc/index.html
   applies_to: [DS-CW-registru, DS-CW-istoric, DS-CW-editii, DS-CW-analiza, DS-CW-vizualizari, DS-CW-calitate, DS-CW-schema, DS-CW-api, DS-CW-acces]
   original_mock_commit: 2dc3bf2c6823ca733bc8d4b045a4dea241055106
+  corrected_mock_commit: a47f36766e896710fe9810434aa35f5db3d328d9
   evidence_ref: DESIGN.md#corecții-aprobate-pentru-prototipul-etapei-d
 designs:
   - id: DS-CW-dashboard
