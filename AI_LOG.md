@@ -1,5 +1,13 @@
 # AI log
 
+## 2026-11-19 · Lab 1 Section G PR review correction
+
+After independent review of PR #5, the owner approved one low-severity
+requirements-matrix correction. The SQL diff row now records the implemented
+`Pipeline.diff_details()` behavior and synthetic coverage, keeps API/dashboard
+exposure as future work, and states that real ONRC performance remains
+unverified and gated by Q-005.
+
 ## 2026-11-19 · Lab 1 Section G corrected prototype approval
 
 The owner personally inspected the corrected Section D prototype in the browser
