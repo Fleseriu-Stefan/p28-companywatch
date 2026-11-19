@@ -1,0 +1,1015 @@
+<!doctype html>
+<html lang="ro" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CompanyWatch · Machetă de revizuire · Direcția 2</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #F5F7FA;
+      --surface: #FFFFFF;
+      --surface-subtle: #EEF3F8;
+      --text: #192638;
+      --text-secondary: #48596E;
+      --divider: #D6DFE9;
+      --control-border: #72849A;
+      --accent: #36597F;
+      --accent-hover: #2D4C70;
+      --accent-active: #233E5E;
+      --on-accent: #FFFFFF;
+      --accent-surface: #E7EFF8;
+      --focus-ring: #3C6A9B;
+      --chart-fill: #5278A3;
+      --added: #206140;
+      --added-bg: #E6F3EB;
+      --removed: #823A53;
+      --removed-bg: #F8EAF0;
+      --modified: #36597F;
+      --modified-bg: #E7EFF8;
+      --unchanged: #48596E;
+      --unchanged-bg: #EEF3F8;
+      --unavailable: #545F6E;
+      --unavailable-bg: #EDF0F4;
+      --warning: #774700;
+      --warning-bg: #FFF1DA;
+      --error: #A12632;
+      --error-bg: #FCECEF;
+      --shadow-menu: 0 8px 24px rgb(0 0 0 / 12%);
+      --gutter: 16px;
+      --section-gap: 24px;
+      --card-padding: 16px;
+      --radius-control: 8px;
+      --radius-card: 12px;
+      --motion-control: 120ms;
+      --motion-disclosure: 180ms;
+    }
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --canvas: #101820;
+      --surface: #17222E;
+      --surface-subtle: #202E3D;
+      --text: #EDF2F8;
+      --text-secondary: #B0BECF;
+      --divider: #334659;
+      --control-border: #7B8FA5;
+      --accent: #9EBCE0;
+      --accent-hover: #B1CBEB;
+      --accent-active: #8CAACD;
+      --on-accent: #142335;
+      --accent-surface: #233B54;
+      --focus-ring: #B1D3FF;
+      --chart-fill: #89AED8;
+      --added: #A6DDB9;
+      --added-bg: #193828;
+      --removed: #F3B5CB;
+      --removed-bg: #402535;
+      --modified: #B2CEEE;
+      --modified-bg: #233B54;
+      --unchanged: #B0BECF;
+      --unchanged-bg: #202E3D;
+      --unavailable: #BEC7D4;
+      --unavailable-bg: #2B3541;
+      --warning: #FFD18A;
+      --warning-bg: #412F17;
+      --error: #FFB4B8;
+      --error-bg: #48262F;
+      --shadow-menu: 0 8px 24px rgb(0 0 0 / 28%);
+    }
+    @media (min-width: 768px) {
+      :root { --gutter: 24px; }
+    }
+    @media (min-width: 1024px) {
+      :root { --gutter: 32px; --section-gap: 32px; --card-padding: 24px; }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--text);
+      font: 400 16px / 24px Inter, system-ui, sans-serif;
+      font-variant-numeric: tabular-nums;
+    }
+    h1, h2, h3, p, dl, dd, figure { margin: 0; }
+    h1 { font-size: 26px; line-height: 34px; font-weight: 700; }
+    h2 { font-size: 22px; line-height: 30px; font-weight: 600; }
+    h3 { font-size: 18px; line-height: 26px; font-weight: 600; }
+    small, .supporting { font-size: 14px; line-height: 22px; color: var(--text-secondary); }
+    .wrap { width: min(1280px, calc(100% - var(--gutter) * 2)); margin-inline: auto; }
+    a { color: var(--accent); text-underline-offset: 4px; }
+    a:hover { text-decoration-thickness: 2px; }
+    :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+    button, input, select, summary { font: inherit; color: inherit; }
+    button, summary, select { cursor: pointer; }
+    .button, input[type="search"], select, summary.control {
+      min-height: 44px;
+      max-width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-control);
+      background: var(--surface);
+      font-weight: 500;
+    }
+    .button, summary.control {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color var(--motion-control);
+    }
+    .button:hover, summary.control:hover { background: var(--surface-subtle); }
+    .button.primary { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+    .button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .button.primary:active { background: var(--accent-active); }
+    .button:disabled { color: var(--text-secondary); background: var(--surface-subtle); cursor: default; }
+    .quiet { color: var(--accent); }
+    .icon-button { min-width: 44px; padding-inline: 8px; }
+    .sr-only, .skip-link:not(:focus) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .skip-link:focus { position: absolute; z-index: 4; padding: 12px; background: var(--surface); }
+    .site-header { background: var(--surface); border-bottom: 1px solid var(--divider); }
+    .header-row { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .brand { display: inline-flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; font-size: 18px; font-weight: 700; }
+    .brand-mark { display: flex; align-items: end; justify-content: center; gap: 4px; width: 32px; height: 32px; padding-bottom: 8px; border-radius: 8px; background: var(--accent-surface); }
+    .brand-mark i { width: 4px; border-radius: 4px; background: var(--accent); }
+    .brand-mark i:nth-child(1) { height: 8px; }
+    .brand-mark i:nth-child(2) { height: 12px; }
+    .brand-mark i:nth-child(3) { height: 16px; }
+    .header-actions, .desktop-nav { display: flex; align-items: center; gap: 8px; }
+    .desktop-nav { display: none; }
+    .desktop-nav a, .mobile-nav a { display: flex; align-items: center; min-height: 44px; text-decoration: none; color: var(--text-secondary); }
+    .desktop-nav a:hover, .mobile-nav a:hover { color: var(--accent); text-decoration: underline; }
+    .sign-in { display: none; }
+    .mobile-nav { position: relative; }
+    .mobile-nav .menu-panel { min-width: 192px; }
+    .draft-bar { border-bottom: 1px solid var(--divider); background: var(--surface-subtle); }
+    .draft-content { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding-block: 8px; }
+    .draft-label { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .draft-label strong { color: var(--accent); }
+    .draft-content .button { background: var(--surface); }
+    main { padding-block: 32px 48px; display: grid; gap: var(--section-gap); }
+    .intro { display: grid; gap: 8px; }
+    .intro p { color: var(--text-secondary); max-width: 68ch; }
+    .card { min-width: 0; padding: var(--card-padding); border: 1px solid var(--divider); border-radius: var(--radius-card); background: var(--surface); }
+    .section-heading { margin-bottom: 16px; }
+    .section-heading > * + *, .card-title > * + * { margin-top: 4px; }
+    .heading-with-action { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 12px 16px; }
+    .stack { display: grid; gap: 16px; }
+    .label { display: grid; align-content: start; gap: 4px; font-weight: 500; }
+    .search-card { border-top: 4px solid var(--accent); }
+    .search-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px 12px; position: relative; }
+    .search-form input { width: 100%; }
+    .search-form input::placeholder { color: var(--text-secondary); }
+    .search-feedback { margin-top: 8px; min-height: 22px; }
+    .search-options, .menu-panel {
+      position: absolute;
+      z-index: 3;
+      margin: 0;
+      padding: 8px;
+      border: 1px solid var(--divider);
+      border-radius: var(--radius-control);
+      background: var(--surface);
+      box-shadow: var(--shadow-menu);
+    }
+    .search-options { top: 100%; left: 0; right: 0; list-style: none; }
+    .search-options li { display: grid; gap: 4px; min-height: 44px; align-content: center; padding: 8px 12px; border-radius: var(--radius-control); cursor: pointer; }
+    .search-options li[aria-selected="true"], .search-options li:hover { background: var(--accent-surface); }
+    details.popup { position: relative; width: fit-content; }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    .menu-panel { top: calc(100% + 4px); right: 0; min-width: 128px; }
+    .menu-panel button { justify-content: flex-start; width: 100%; }
+    .menu-panel .button + .button { margin-top: 4px; }
+    .profile-meta, .edition-source { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+    .profile-grid { display: grid; gap: 0 24px; }
+    .profile-grid div { min-width: 0; padding-block: 12px; border-top: 1px solid var(--divider); }
+    .profile-grid dt { font-size: 14px; line-height: 22px; color: var(--text-secondary); }
+    .profile-grid dd { font-weight: 500; overflow-wrap: anywhere; }
+    .company-title { margin-bottom: 4px; overflow-wrap: anywhere; }
+    .edition-grid { display: grid; gap: 12px; }
+    .edition { padding: 12px; border: 1px solid var(--divider); border-radius: var(--radius-control); background: var(--surface-subtle); }
+    .edition select { width: 100%; }
+    .edition-source { margin-top: 4px; }
+    .compare-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+    .checkbox { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; cursor: pointer; }
+    .checkbox input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+    .change-summary { display: flex; flex-wrap: wrap; gap: 8px; }
+    .status { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: 14px; line-height: 22px; font-weight: 500; border-radius: 999px; }
+    .status.added { color: var(--added); background: var(--added-bg); }
+    .status.removed { color: var(--removed); background: var(--removed-bg); }
+    .status.modified { color: var(--modified); background: var(--modified-bg); }
+    .status.unchanged { color: var(--unchanged); background: var(--unchanged-bg); }
+    .status.unavailable { color: var(--unavailable); background: var(--unavailable-bg); }
+    .table-frame { border: 1px solid var(--divider); border-radius: var(--radius-control); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; line-height: 22px; table-layout: fixed; }
+    th, td { height: 48px; padding: 12px 16px; overflow-wrap: anywhere; vertical-align: top; }
+    thead { background: var(--surface-subtle); }
+    th { font-weight: 600; }
+    tbody tr { border-top: 1px solid var(--divider); }
+    .comparison-table { display: none; }
+    .mobile-comparison { display: grid; gap: 12px; }
+    .change-card { padding: 12px; border: 1px solid var(--divider); border-radius: var(--radius-control); display: grid; gap: 12px; overflow-wrap: anywhere; }
+    .change-card .heading-with-action { align-items: center; }
+    .change-card dt { font-size: 14px; line-height: 22px; color: var(--text-secondary); }
+    .change-card dd + dt { margin-top: 8px; }
+    .empty { padding: 16px; border-radius: var(--radius-control); background: var(--surface-subtle); color: var(--text-secondary); display: flex; gap: 12px; align-items: start; }
+    .empty-icon { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--radius-control); background: var(--accent-surface); color: var(--accent); font-weight: 600; }
+    .empty strong { display: block; color: var(--text); font-weight: 600; }
+    .chart-grid { display: grid; align-items: start; gap: 16px; }
+    .chart-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+    .chart-filters .label { min-width: min(144px, 100%); flex: 1 1 144px; font-size: 14px; line-height: 22px; }
+    .chart-filters select { width: 100%; font-weight: 400; }
+    .chart-box { padding-block: 8px; }
+    .chart-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+    .chart-line { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 32px; font-size: 14px; line-height: 22px; }
+    .chart-track { background: var(--surface-subtle); border-radius: 4px; height: 12px; }
+    .chart-bar { display: block; background: var(--chart-fill); height: 100%; border-radius: 4px; }
+    .chart-value { min-width: 64px; text-align: right; font-weight: 600; }
+    .chart-data > summary { color: var(--accent); min-height: 44px; display: flex; align-items: center; gap: 8px; width: fit-content; }
+    .disclosure::before { content: "▸"; }
+    details[open] > .disclosure::before { content: "▾"; }
+    .threshold-note { color: var(--warning); background: var(--warning-bg); border-radius: var(--radius-control); padding: 8px 12px; }
+    .site-footer { padding-block: 16px 24px; border-top: 1px solid var(--divider); }
+    dialog { background: var(--surface); color: var(--text); border: 1px solid var(--divider); border-radius: var(--radius-card); width: min(440px, calc(100% - 32px)); padding: 24px; }
+    dialog::backdrop { background: rgb(0 0 0 / 28%); }
+
+    /* Second visual direction. The approved palette and type scale still apply. */
+    .brand { white-space: nowrap; }
+    .brand-mark { background: var(--accent); }
+    .brand-mark i { background: var(--on-accent); }
+    .wordmark-emphasis { color: var(--accent); }
+    .desktop-nav {
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--divider);
+      border-radius: var(--radius-card);
+      background: var(--surface-subtle);
+    }
+    .desktop-nav a {
+      padding-inline: 12px;
+      border-radius: var(--radius-control);
+      font-weight: 500;
+    }
+    .desktop-nav a:hover { background: var(--surface); }
+    .desktop-nav .nav-search { background: var(--accent-surface); color: var(--accent); }
+    .header-actions .icon-button { background: var(--surface-subtle); }
+    .draft-content { padding-block: 4px; }
+    .draft-label strong {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--accent-surface);
+    }
+    .intro {
+      position: relative;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: center;
+      padding: var(--card-padding);
+      overflow: hidden;
+      border: 1px solid var(--divider);
+      border-inline-start: 4px solid var(--accent);
+      border-radius: var(--radius-card);
+      background: var(--accent-surface);
+    }
+    .intro-copy { display: grid; gap: 8px; }
+    .intro-graphic { display: none; }
+    .snapshot-motif {
+      width: 72px;
+      padding: 12px;
+      border: 1px solid var(--divider);
+      border-radius: var(--radius-control);
+      background: var(--surface);
+    }
+    .snapshot-motif.current { border-color: var(--accent); }
+    .snapshot-line {
+      display: block;
+      width: 100%;
+      height: 4px;
+      border-radius: 4px;
+      background: var(--divider);
+    }
+    .snapshot-line + .snapshot-line { margin-top: 8px; }
+    .snapshot-line.short { width: 62%; }
+    .snapshot-line.changed { background: var(--chart-fill); }
+    .snapshot-arrow { color: var(--accent); font-weight: 600; }
+    .search-card { border-top: 1px solid var(--divider); }
+    .search-input { position: relative; }
+    .search-input input { padding-inline-start: 40px; }
+    .search-glyph {
+      position: absolute;
+      inset-block-start: 14px;
+      inset-inline-start: 12px;
+      width: 16px;
+      height: 16px;
+      pointer-events: none;
+    }
+    .search-glyph i {
+      position: absolute;
+      display: block;
+    }
+    .search-glyph .lens {
+      inset: 0 auto auto 0;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .search-glyph .lens-center {
+      inset: 2px auto auto 2px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--surface);
+    }
+    .search-glyph .handle {
+      inset-inline-start: 8px;
+      inset-block-start: 11px;
+      width: 8px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--accent);
+      transform: rotate(45deg);
+    }
+    .search-form .primary { padding-inline: 16px; }
+    .profile-meta { margin-bottom: 16px; }
+    .profile-grid {
+      gap: 0;
+      border: 1px solid var(--divider);
+      border-radius: var(--radius-control);
+      background: var(--surface-subtle);
+    }
+    .profile-grid div {
+      padding: 8px 12px;
+      border: 0;
+    }
+    .profile-grid div + div { border-top: 1px solid var(--divider); }
+    .profile-grid dd { margin-top: 4px; }
+    .edition.is-current {
+      border-color: var(--accent);
+      background: var(--accent-surface);
+    }
+    .edition.is-current .label { color: var(--accent); }
+    .edition.is-current select { color: var(--text); }
+    .compare-toolbar {
+      padding: 4px 12px;
+      border: 1px solid var(--divider);
+      border-radius: var(--radius-control);
+      background: var(--surface-subtle);
+    }
+    .comparison-table thead th:nth-child(3) { color: var(--accent); background: var(--accent-surface); }
+    .comparison-table tbody tr:not([data-change="unchanged"]):not([data-change="unavailable"]) td:nth-child(3) {
+      background: var(--accent-surface);
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .change-card {
+      border-inline-start: 4px solid var(--divider);
+    }
+    .change-card[data-change="modified"], .change-card[data-change="added"] { border-inline-start-color: var(--accent); }
+    .change-values { display: grid; gap: 8px; }
+    .change-value { padding: 8px 12px; border-radius: var(--radius-control); background: var(--surface-subtle); }
+    .change-value.is-current { background: var(--accent-surface); }
+    .change-value dd { margin-top: 4px; }
+    .chart-card .heading-with-action {
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--divider);
+    }
+    .chart-filters {
+      padding: 12px;
+      border-radius: var(--radius-control);
+      background: var(--surface-subtle);
+    }
+    .chart-box { padding-block: 4px; }
+    .chart-scale, .chart-line {
+      grid-template-columns: 84px minmax(0, 1fr) 64px;
+    }
+    .chart-scale {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .chart-scale-values { grid-column: 2; display: flex; justify-content: space-between; gap: 4px; }
+    .chart-scale-middle { display: none; }
+    .chart-track {
+      position: relative;
+      height: 16px;
+      overflow: hidden;
+      border: 1px solid var(--divider);
+    }
+    .chart-track::before {
+      position: absolute;
+      inset: 0 50% 0 auto;
+      border-inline-start: 1px solid var(--divider);
+      content: "";
+    }
+    .chart-bar {
+      position: relative;
+      transform-origin: left;
+      border-radius: 4px;
+    }
+    .chart-value { min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
+    .chart-data { border-top: 1px solid var(--divider); padding-top: 4px; }
+    .chart-data > summary:hover { text-decoration: underline; text-underline-offset: 4px; }
+    @media (min-width: 768px) {
+      h1 { font-size: 32px; line-height: 40px; }
+      .header-row { min-height: 72px; gap: 24px; }
+      .header-actions { gap: 16px; }
+      .desktop-nav { display: flex; }
+      .sign-in { display: inline-flex; align-items: center; min-height: 44px; }
+      .mobile-nav { display: none; }
+      .intro { grid-template-columns: minmax(0, 1fr) auto; gap: 24px; }
+      .intro-graphic { display: flex; align-items: center; gap: 12px; padding-inline: 12px; }
+      .search-form { max-width: 768px; }
+      .profile-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        border: 0;
+        background: transparent;
+      }
+      .profile-grid div, .profile-grid div + div {
+        padding: 12px;
+        border: 1px solid var(--divider);
+        border-radius: var(--radius-control);
+        background: var(--surface-subtle);
+      }
+      .edition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .comparison-table { display: block; }
+      .mobile-comparison { display: none; }
+      .chart-scale-middle { display: inline; }
+    }
+    @media (min-width: 1024px) {
+      main { padding-top: 48px; }
+      .profile-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+      .chart-card { grid-template-rows: auto auto 1fr auto; }
+      .chart-card .threshold-note:not([hidden]) { grid-row: 4; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      html { scroll-behavior: smooth; }
+      .button, summary.control, .desktop-nav a {
+        transition: background-color var(--motion-control), border-color var(--motion-control), transform var(--motion-control);
+      }
+      .button.primary:hover { transform: translateY(-1px); }
+      .button.primary:active { transform: translateY(0); }
+      .chart-bar { animation: chart-settle var(--motion-disclosure) ease-out both; }
+      .profile-grid, .comparison-table table, .change-card {
+        animation: content-settle var(--motion-disclosure) ease-out both;
+      }
+    }
+    @keyframes chart-settle {
+      from { transform: scaleX(0.9); opacity: 0.82; }
+      to { transform: scaleX(1); opacity: 1; }
+    }
+    @keyframes content-settle {
+      from { transform: translateY(4px); opacity: 0.85; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#continut">Sari la conținut</a>
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="#continut">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Company<span class="wordmark-emphasis">Watch</span></span>
+      </a>
+      <nav class="desktop-nav" aria-label="Navigare principală">
+        <a class="nav-search" href="#cautare">Căutare</a><a href="#comparatie">Comparație</a><a href="#analiza">Analiză</a>
+      </nav>
+      <div class="header-actions">
+        <button class="button icon-button" type="button" id="theme-button" aria-label="Comută la tema întunecată" aria-pressed="false" title="Schimbă tema"><span aria-hidden="true">☾</span></button>
+        <a class="sign-in" href="#autentificare" data-sign-in>Autentificare</a>
+        <details class="popup mobile-nav">
+          <summary class="control">Meniu</summary>
+          <nav class="menu-panel" aria-label="Navigare mobilă">
+            <a href="#cautare">Căutare</a><a href="#comparatie">Comparație</a><a href="#analiza">Analiză</a>
+            <a href="#autentificare" data-sign-in>Autentificare</a>
+          </nav>
+        </details>
+      </div>
+    </div>
+  </header>
+
+  <div class="draft-bar">
+    <div class="wrap draft-content">
+      <p class="draft-label supporting"><strong>Machetă · Direcția 2</strong><span>Date sintetice. Exemple fără legătură cu rezultate ONRC reale.</span></p>
+      <button class="button quiet" id="state-button" type="button">Vezi prima vizită</button>
+    </div>
+  </div>
+
+  <main class="wrap" id="continut">
+    <div class="intro">
+      <div class="intro-copy">
+        <h1>Verifică o firmă</h1>
+        <p>Consultă profilul unei firme și vezi ce s-a schimbat între două ediții ONRC.</p>
+      </div>
+      <div class="intro-graphic" aria-hidden="true">
+        <span class="snapshot-motif"><i class="snapshot-line"></i><i class="snapshot-line short"></i></span>
+        <span class="snapshot-arrow">→</span>
+        <span class="snapshot-motif current"><i class="snapshot-line changed"></i><i class="snapshot-line short"></i></span>
+      </div>
+    </div>
+
+    <section class="card search-card" id="cautare" aria-labelledby="search-heading">
+      <div class="section-heading"><h2 id="search-heading">Caută o firmă</h2></div>
+      <form class="search-form" id="company-search" role="search">
+        <label class="label" for="company-query">
+          Denumire sau CUI
+          <span class="search-input">
+            <span class="search-glyph" aria-hidden="true"><i class="lens"></i><i class="lens-center"></i><i class="handle"></i></span>
+            <input type="search" id="company-query" placeholder="Atelier Nord" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="search-options" autocomplete="off">
+          </span>
+        </label>
+        <button class="button primary" type="submit">Caută</button>
+        <ul class="search-options" id="search-options" role="listbox" aria-label="Firme găsite" hidden></ul>
+      </form>
+      <p class="supporting search-feedback" id="search-feedback" aria-live="polite">Introdu cel puțin trei caractere.</p>
+    </section>
+
+    <section class="card" id="profil" aria-labelledby="profile-heading">
+      <div class="section-heading"><h2 id="profile-heading">Profilul firmei</h2></div>
+      <div id="profile-content" aria-live="polite"></div>
+    </section>
+
+    <section class="card" id="comparatie" aria-labelledby="compare-heading">
+      <div class="section-heading heading-with-action">
+        <div class="card-title">
+          <h2 id="compare-heading">Comparație între ediții</h2>
+          <p class="supporting">Vezi diferențele dintre două instantanee ale aceleiași firme.</p>
+        </div>
+        <details class="popup" id="compare-export">
+          <summary class="control">Exportă <span aria-hidden="true">▾</span></summary>
+          <div class="menu-panel">
+            <button class="button" type="button" data-export="CSV">CSV</button>
+            <button class="button" type="button" data-export="XLSX">XLSX</button>
+          </div>
+        </details>
+      </div>
+      <div id="compare-empty" aria-live="polite"></div>
+      <div class="stack" id="compare-controls">
+        <div class="edition-grid">
+          <div class="edition">
+            <label class="label" for="old-edition">Ediția anterioară
+              <select id="old-edition"></select>
+            </label>
+            <p class="supporting edition-source">Sursă demonstrată: ONRC · ediție sintetică</p>
+          </div>
+          <div class="edition is-current">
+            <label class="label" for="new-edition">Ediția curentă
+              <select id="new-edition"></select>
+            </label>
+            <p class="supporting edition-source">Sursă demonstrată: ONRC · ediție sintetică</p>
+          </div>
+        </div>
+        <div id="compare-content" aria-live="polite" class="stack">
+          <div class="compare-toolbar">
+            <div class="change-summary" id="change-summary"></div>
+            <label class="checkbox" for="show-unchanged"><input type="checkbox" id="show-unchanged">Arată câmpurile neschimbate</label>
+          </div>
+          <div class="comparison-table table-frame" id="comparison-table"></div>
+          <div class="mobile-comparison" id="comparison-cards"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="analiza" aria-labelledby="analysis-heading">
+      <div class="section-heading">
+        <h2 id="analysis-heading">Analiză</h2>
+        <p class="supporting">Explorează firmele și indicatorii de calitate ai edițiilor publicate.</p>
+      </div>
+      <div class="chart-grid">
+        <article class="card chart-card stack" aria-labelledby="count-heading">
+          <div class="heading-with-action">
+            <div class="card-title">
+              <h3 id="count-heading">Firme după forma juridică</h3>
+              <p class="supporting">Numărul de firme din ediția selectată.</p>
+            </div>
+            <details class="popup">
+              <summary class="control">Exportă <span aria-hidden="true">▾</span></summary>
+              <div class="menu-panel"><button class="button" type="button" data-export="CSV">CSV</button><button class="button" type="button" data-export="XLSX">XLSX</button></div>
+            </details>
+          </div>
+          <div class="chart-filters">
+            <label class="label" for="count-edition">Ediția ONRC<select id="count-edition"></select></label>
+            <label class="label" for="legal-form">Forma juridică
+              <select id="legal-form"><option>Toate formele</option><option>SRL</option><option>SA</option><option>SNC</option></select>
+            </label>
+          </div>
+          <figure class="chart-box" id="count-chart" aria-describedby="count-summary"></figure>
+          <details class="chart-data"><summary class="disclosure">Vezi datele<span class="sr-only"> pentru firme după forma juridică</span></summary><div id="count-data"></div></details>
+        </article>
+
+        <article class="card chart-card stack" aria-labelledby="quality-heading">
+          <div class="heading-with-action">
+            <div class="card-title">
+              <h3 id="quality-heading">Calitatea datelor pe ediții</h3>
+              <p class="supporting">Rezultatele verificărilor de ingestie.</p>
+            </div>
+            <details class="popup">
+              <summary class="control">Exportă <span aria-hidden="true">▾</span></summary>
+              <div class="menu-panel"><button class="button" type="button" data-export="CSV">CSV</button><button class="button" type="button" data-export="XLSX">XLSX</button></div>
+            </details>
+          </div>
+          <div class="chart-filters">
+            <label class="label" for="quality-editions">Ediții ONRC
+              <select id="quality-editions">
+                <option value="latest">Ultimele două ediții</option><option value="all">Toate edițiile</option>
+              </select>
+            </label>
+            <label class="label" for="quality-metric">Indicator
+              <select id="quality-metric">
+                <option value="accepted">Rânduri acceptate</option><option value="quarantined">Rânduri în carantină</option><option value="excluded">Rânduri excluse intenționat</option>
+              </select>
+            </label>
+          </div>
+          <figure class="chart-box" id="quality-chart" aria-describedby="quality-summary"></figure>
+          <p class="supporting threshold-note" id="quality-note" hidden></p>
+          <details class="chart-data"><summary class="disclosure">Vezi datele<span class="sr-only"> pentru calitatea datelor pe ediții</span></summary><div id="quality-data"></div></details>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><p class="wrap supporting">CompanyWatch · Machetă cu date sintetice</p></footer>
+
+  <dialog id="draft-dialog" aria-labelledby="autentificare">
+    <form method="dialog" class="stack">
+      <h2 id="autentificare">Previzualizare</h2>
+      <p id="dialog-description"></p>
+      <button class="button" type="submit">Închide</button>
+    </form>
+  </dialog>
+
+  <script>
+    const byId = (id) => document.getElementById(id);
+    const parameters = new URLSearchParams(location.search);
+    const systemTheme = matchMedia("(prefers-color-scheme: dark)");
+
+    function savedTheme() {
+      try {
+        return localStorage.getItem("companywatch-draft-theme");
+      } catch {
+        return null;
+      }
+    }
+
+    function setTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      const dark = theme === "dark";
+      const button = byId("theme-button");
+      button.setAttribute("aria-pressed", String(dark));
+      button.setAttribute("aria-label", dark ? "Comută la tema luminoasă" : "Comută la tema întunecată");
+      button.querySelector("span").textContent = dark ? "☀" : "☾";
+    }
+
+    const requestedTheme = parameters.get("theme");
+    const systemThemeName = () => systemTheme.matches ? "dark" : "light";
+    setTheme(["light", "dark"].includes(requestedTheme) ? requestedTheme : savedTheme() || systemThemeName());
+    systemTheme.addEventListener("change", () => {
+      if (!requestedTheme && !savedTheme()) setTheme(systemThemeName());
+    });
+    byId("theme-button").addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem("companywatch-draft-theme", next);
+      } catch {
+        // The theme can still change if local browser storage is unavailable.
+      }
+      setTheme(next);
+    });
+
+    // All company names, identifiers, edition dates and counts below are synthetic.
+    const editions = [
+      { date: "05.09.2026", forms: { SRL: 118240, SA: 6310, SNC: 1780 }, quarantined: 1406, excluded: 4560 },
+      { date: "03.10.2026", forms: { SRL: 119830, SA: 6390, SNC: 1800 }, quarantined: 1326, excluded: 4920 },
+      { date: "07.11.2026", forms: { SRL: 122460, SA: 6475, SNC: 1835 }, quarantined: 1102, excluded: 5116 },
+    ];
+    const firms = [
+      {
+        name: "Atelier Nord Exemplu SRL", cui: "DEMO-001", euid: "DEMO.RO.001", registration: "J-DEMO-001",
+        form: "SRL", registered: "18.06.2018",
+        history: [
+          { name: "Atelier Nord Exemplu SRL", county: "Brașov", locality: "Săcele" },
+          { name: "Atelier Nord Exemplu SRL", county: "Brașov", locality: "Săcele" },
+          { name: "Atelier Nord Exemplu SRL", county: "Cluj", locality: "Cluj-Napoca" },
+        ],
+      },
+      {
+        name: "Meridian Exemplu SA", cui: "DEMO-002", euid: "DEMO.RO.002", registration: "J-DEMO-002",
+        form: "SA", registered: null,
+        history: [null, null, { name: "Meridian Exemplu SA", county: "Sibiu", locality: "Sibiu" }],
+      },
+      {
+        name: "Orizont Exemplu SNC", cui: "DEMO-003", euid: "DEMO.RO.003", registration: "J-DEMO-003",
+        form: "SNC", registered: "12.03.2012",
+        history: [
+          { name: "Orizont Exemplu SNC", county: "Iași", locality: "Iași" },
+          { name: "Orizont Exemplu SNC", county: "Iași", locality: "Iași" },
+          null,
+        ],
+      },
+    ];
+    const fields = [
+      ["name", "Denumire"], ["cui", "CUI"], ["euid", "EUID"], ["registration", "Nr. de înmatriculare"],
+      ["form", "Formă juridică"], ["county", "Județ"], ["locality", "Localitate"], ["registered", "Data înmatriculării"],
+    ];
+    const statusLabels = {
+      added: ["+", "Adăugată"], removed: ["−", "Eliminată"], modified: ["↔", "Modificată"],
+      unchanged: ["=", "Neschimbată"], unavailable: ["—", "Indisponibilă"],
+    };
+    const badge = (kind, text = statusLabels[kind][1]) =>
+      `<span class="status ${kind}"><span aria-hidden="true">${statusLabels[kind][0]}</span> ${text}</span>`;
+    const unavailable = () => badge("unavailable");
+    const emptyState = (title, body, icon = "i") =>
+      `<div class="empty"><span class="empty-icon" aria-hidden="true">${icon}</span><div><strong>${title}</strong><p>${body}</p></div></div>`;
+    const editionOptions = editions.map(({ date }, index) => `<option value="${index}">${date}</option>`).join("");
+    const oldSelect = byId("old-edition");
+    const newSelect = byId("new-edition");
+    const query = byId("company-query");
+    const searchOptions = byId("search-options");
+    const searchFeedback = byId("search-feedback");
+    const firstVisit = parameters.get("state") === "first-visit";
+    let selectedFirm = firstVisit ? null : firms[0];
+    let suggestions = [];
+    let activeSuggestion = -1;
+    let searchTimer;
+    let refreshTimer;
+
+    [oldSelect, newSelect, byId("count-edition")].forEach((select) => { select.innerHTML = editionOptions; });
+    oldSelect.value = "1";
+    newSelect.value = "2";
+    byId("count-edition").value = "2";
+    byId("quality-editions").insertAdjacentHTML("beforeend", editionOptions);
+
+    function firmAt(firm, index) {
+      return firm.history[index] ? { ...firm, ...firm.history[index] } : null;
+    }
+
+    function profileFacts(record, editionIndex, historical = false) {
+      return `<h3 class="company-title">${record.name}</h3>
+        <p class="profile-meta supporting">${historical ? "Profil istoric · " : ""}Ediția ${editions[editionIndex].date} · Sursă demonstrată: ONRC · date sintetice</p>
+        <dl class="profile-grid">
+          ${fields.filter(([key]) => key !== "name").map(([key, label]) =>
+            `<div><dt>${label}</dt><dd>${record[key] ?? unavailable()}</dd></div>`).join("")}
+        </dl>`;
+    }
+
+    function comparisonRows(previous, current) {
+      return fields.map(([key, label]) => {
+        const before = previous?.[key];
+        const after = current?.[key];
+        const kind = before == null && after == null ? "unavailable"
+          : previous === null ? "added"
+          : current === null ? "removed"
+          : before === after ? "unchanged" : "modified";
+        return { label, before, after, kind };
+      });
+    }
+
+    function renderComparison() {
+      const oldIndex = Number(oldSelect.value);
+      const newIndex = Number(newSelect.value);
+      const previous = firmAt(selectedFirm, oldIndex);
+      const current = firmAt(selectedFirm, newIndex);
+      const oldDate = editions[oldIndex].date;
+      const newDate = editions[newIndex].date;
+      const showUnchanged = byId("show-unchanged").checked;
+      const allRows = comparisonRows(previous, current);
+      const rows = allRows
+        .filter(({ kind }) => showUnchanged || kind !== "unchanged")
+        .sort((left, right) => Number(left.kind === "unchanged") - Number(right.kind === "unchanged"));
+      const changed = allRows.filter(({ kind }) => kind === "modified").length;
+      const unchanged = allRows.filter(({ kind }) => kind === "unchanged").length;
+
+      byId("change-summary").innerHTML = previous && current
+        ? `${badge("modified", changed === 1 ? "1 câmp modificat" : `${changed} câmpuri modificate`)}
+           ${badge("unchanged", unchanged === 1 ? "1 câmp neschimbat" : `${unchanged} câmpuri neschimbate`)}`
+        : previous || current ? badge(previous ? "removed" : "added") : unavailable();
+      byId("show-unchanged").disabled = unchanged === 0;
+
+      const noRows = emptyState("Nu s-au observat modificări", "Activează afișarea câmpurilor neschimbate pentru a vedea valorile.");
+      const noCompany = emptyState("Firma este absentă din ambele ediții", "Selectează alte ediții publicate pentru a vedea informațiile disponibile.");
+      const table = byId("comparison-table");
+      const cards = byId("comparison-cards");
+      if (!previous && !current || rows.length === 0) {
+        table.innerHTML = cards.innerHTML = !previous && !current ? noCompany : noRows;
+        return;
+      }
+      table.innerHTML = `<table><caption class="sr-only">Comparație între edițiile sintetice ${oldDate} și ${newDate}</caption>
+        <thead><tr><th scope="col">Câmp</th><th scope="col">Valoare anterioară · ${oldDate}</th><th scope="col">Valoare curentă · ${newDate}</th><th scope="col">Stare</th></tr></thead>
+        <tbody>${rows.map(({label, before, after, kind}) => `<tr data-change="${kind}"><th scope="row">${label}</th><td>${before ?? unavailable()}</td><td>${after ?? unavailable()}</td><td>${badge(kind)}</td></tr>`).join("")}</tbody></table>`;
+      cards.innerHTML = rows.map(({label, before, after, kind}) => `<article class="change-card" data-change="${kind}">
+        <div class="heading-with-action"><h3>${label}</h3>${badge(kind)}</div>
+        <dl class="change-values">
+          <div class="change-value"><dt>Valoare anterioară · ${oldDate}</dt><dd>${before ?? unavailable()}</dd></div>
+          <div class="change-value${kind === "modified" || kind === "added" ? " is-current" : ""}">
+            <dt>Valoare curentă · ${newDate}</dt><dd>${after ?? unavailable()}</dd>
+          </div>
+        </dl>
+        </article>`).join("");
+    }
+
+    function renderSelectedFirm() {
+      const profile = byId("profile-content");
+      const comparisonEmpty = byId("compare-empty");
+      byId("compare-controls").hidden = !selectedFirm;
+      byId("compare-export").hidden = !selectedFirm;
+      comparisonEmpty.hidden = Boolean(selectedFirm);
+      byId("state-button").textContent = selectedFirm ? "Vezi prima vizită" : "Vezi exemplul completat";
+      if (!selectedFirm) {
+        profile.innerHTML = emptyState("Nicio firmă selectată", "Caută și selectează o firmă pentru a vedea informațiile acesteia.");
+        comparisonEmpty.innerHTML = emptyState("Comparația începe după selecție", "Selectează o firmă pentru a compara datele dintre edițiile ONRC.", "↔");
+        return;
+      }
+
+      const previous = firmAt(selectedFirm, Number(oldSelect.value));
+      const current = firmAt(selectedFirm, Number(newSelect.value));
+      const historical = previous ? profileFacts(previous, Number(oldSelect.value), true) : "";
+      profile.innerHTML = current ? profileFacts(current, Number(newSelect.value))
+        : `<div class="stack">${emptyState("Firma nu apare în ediția curentă",
+            `Instantaneul din ${editions[Number(newSelect.value)].date} nu conține această firmă. Sursă demonstrată: ONRC · date sintetice.`)}${historical}</div>`;
+      renderComparison();
+    }
+
+    function onEditionChange() {
+      clearTimeout(refreshTimer);
+      if (Number(oldSelect.value) > Number(newSelect.value)) {
+        [oldSelect.value, newSelect.value] = [newSelect.value, oldSelect.value];
+      }
+      const profile = byId("profile-content");
+      const comparisonEmpty = byId("compare-empty");
+      const invalid = oldSelect.value === newSelect.value;
+      byId("compare-content").hidden = true;
+      comparisonEmpty.hidden = false;
+      profile.innerHTML = comparisonEmpty.innerHTML = invalid
+        ? emptyState("Alege două ediții diferite", "Selectează o ediție anterioară și una curentă.")
+        : emptyState("Se actualizează datele", "Profilul și comparația se încarcă pentru edițiile selectate.");
+      if (invalid) return;
+      refreshTimer = setTimeout(() => {
+        byId("compare-content").hidden = false;
+        renderSelectedFirm();
+      }, 180);
+    }
+
+    oldSelect.addEventListener("change", onEditionChange);
+    newSelect.addEventListener("change", onEditionChange);
+    byId("show-unchanged").addEventListener("change", renderComparison);
+
+    function closeSuggestions() {
+      suggestions = [];
+      activeSuggestion = -1;
+      searchOptions.hidden = true;
+      query.setAttribute("aria-expanded", "false");
+      query.removeAttribute("aria-activedescendant");
+    }
+
+    function selectFirm(firm) {
+      clearTimeout(searchTimer);
+      clearTimeout(refreshTimer);
+      selectedFirm = firm;
+      query.value = firm ? firm.name : "";
+      searchFeedback.textContent = firm ? `Firmă selectată · CUI ${firm.cui}` : "Introdu cel puțin trei caractere.";
+      closeSuggestions();
+      byId("show-unchanged").checked = false;
+      if (oldSelect.value === newSelect.value) {
+        oldSelect.value = "1";
+        newSelect.value = "2";
+      }
+      byId("compare-content").hidden = false;
+      renderSelectedFirm();
+    }
+
+    function showSuggestions() {
+      const term = query.value.trim().toLocaleLowerCase("ro");
+      closeSuggestions();
+      if (term.length < 3) {
+        searchFeedback.textContent = "Introdu cel puțin trei caractere.";
+        return;
+      }
+      suggestions = firms.filter(({name, cui}) => name.toLocaleLowerCase("ro").includes(term) || cui.toLowerCase().includes(term));
+      searchFeedback.textContent = suggestions.length ? `Rezultate: ${suggestions.length}.` : "Nu am găsit firme în setul sintetic.";
+      searchOptions.innerHTML = suggestions.map(({name, cui}, index) =>
+        `<li id="suggestion-${index}" role="option" aria-selected="false" data-index="${index}"><strong>${name}</strong><span class="supporting">CUI ${cui}</span></li>`).join("");
+      searchOptions.hidden = suggestions.length === 0;
+      query.setAttribute("aria-expanded", String(suggestions.length > 0));
+    }
+
+    query.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      closeSuggestions();
+      searchTimer = setTimeout(showSuggestions, 300);
+    });
+    query.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        clearTimeout(searchTimer);
+        closeSuggestions();
+      } else if (suggestions.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        activeSuggestion = activeSuggestion < 0 && step === -1 ? suggestions.length - 1
+          : (activeSuggestion + step + suggestions.length) % suggestions.length;
+        const activeId = `suggestion-${activeSuggestion}`;
+        query.setAttribute("aria-activedescendant", activeId);
+        searchOptions.querySelectorAll('[role="option"]').forEach((option) =>
+          option.setAttribute("aria-selected", String(option.id === activeId)));
+      }
+    });
+    searchOptions.addEventListener("pointerdown", (event) => { event.preventDefault(); });
+    searchOptions.addEventListener("click", (event) => {
+      const option = event.target.closest("[data-index]");
+      if (option) selectFirm(suggestions[Number(option.dataset.index)]);
+    });
+    byId("company-search").addEventListener("submit", (event) => {
+      event.preventDefault();
+      clearTimeout(searchTimer);
+      if (suggestions.length && activeSuggestion >= 0) selectFirm(suggestions[activeSuggestion]);
+      else showSuggestions();
+    });
+    byId("company-search").addEventListener("focusout", (event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) {
+        clearTimeout(searchTimer);
+        closeSuggestions();
+      }
+    });
+    byId("state-button").addEventListener("click", () => selectFirm(selectedFirm ? null : firms[0]));
+
+    const numberFormat = new Intl.NumberFormat("ro-RO", { useGrouping: "always" });
+    const scaleFormat = new Intl.NumberFormat("ro-RO", { notation: "compact", maximumFractionDigits: 1 });
+    function renderChart(id, title, labelHeading, rows) {
+      const peak = Math.max(1, ...rows.map(({ value }) => value));
+      const step = Math.max(1, 10 ** Math.floor(Math.log10(peak)) / 2);
+      const max = Math.ceil(peak / step) * step;
+      const summary = rows.map(({ label, value }) => `${label}: ${numberFormat.format(value)}`).join(". ");
+      byId(`${id}-chart`).innerHTML = `<figcaption id="${id}-summary" class="sr-only">${title}. ${summary}.</figcaption>
+        <div class="chart-scale supporting" aria-hidden="true">
+          <div class="chart-scale-values"><span>0</span><span class="chart-scale-middle">${scaleFormat.format(max / 2)}</span><span>${scaleFormat.format(max)}</span></div>
+        </div>
+        <ul class="chart-rows" aria-hidden="true">${rows.map(({ label, value }) => `<li class="chart-line">
+        <span>${label}</span><span class="chart-track"><span class="chart-bar" style="width:${value / max * 100}%"></span></span>
+        <span class="chart-value">${numberFormat.format(value)}</span></li>`).join("")}</ul>`;
+      byId(`${id}-data`).innerHTML = `<div class="table-frame"><table><caption class="sr-only">${title}</caption>
+        <thead><tr><th scope="col">${labelHeading}</th><th scope="col">Valoare</th></tr></thead>
+        <tbody>${rows.map(({ label, value }) => `<tr><th scope="row">${label}</th><td>${numberFormat.format(value)}</td></tr>`).join("")}</tbody></table></div>`;
+    }
+
+    function renderCompanyCounts() {
+      const edition = editions[Number(byId("count-edition").value)];
+      const legalForm = byId("legal-form").value;
+      const forms = Object.entries(edition.forms).filter(([label]) => legalForm === "Toate formele" || label === legalForm);
+      renderChart("count", `Număr de firme în ediția sintetică ${edition.date}`, "Formă juridică",
+        forms.map(([label, value]) => ({ label, value })));
+    }
+
+    function renderQualityMetrics() {
+      const qualityScope = byId("quality-editions").value;
+      const metric = byId("quality-metric");
+      const available = qualityScope === "latest" ? editions.slice(-2)
+        : qualityScope === "all" ? editions : [editions[Number(qualityScope)]];
+      const quality = available.map(({ date, forms, ...report }) => ({
+        label: date,
+        value: metric.value === "accepted" ? Object.values(forms).reduce((total, value) => total + value, 0) : report[metric.value],
+      }));
+      renderChart("quality", metric.selectedOptions[0].textContent, "Ediția ONRC", quality);
+      byId("quality-note").hidden = available.length > 1;
+      byId("quality-note").textContent = "Selecția conține o singură ediție. Sunt afișate valorile disponibile.";
+    }
+
+    ["count-edition", "legal-form"].forEach((id) =>
+      byId(id).addEventListener("change", renderCompanyCounts));
+    ["quality-editions", "quality-metric"].forEach((id) =>
+      byId(id).addEventListener("change", renderQualityMetrics));
+
+    const previewDialog = byId("draft-dialog");
+    document.querySelectorAll("[data-sign-in], [data-export]").forEach((control) => {
+      control.addEventListener("click", (event) => {
+        event.preventDefault();
+        byId("autentificare").textContent = control.dataset.export ? `Export ${control.dataset.export}` : "Autentificare";
+        byId("dialog-description").textContent = control.dataset.export
+          ? "Această machetă ilustrează meniul de export. Fișierele vor fi disponibile în aplicație."
+          : "Această machetă prezintă accesul la autentificare pentru curatori și administratori.";
+        control.closest("details")?.removeAttribute("open");
+        previewDialog.showModal();
+      });
+    });
+    document.querySelectorAll('.mobile-nav a[href^="#"]').forEach((link) =>
+      link.addEventListener("click", () => link.closest("details").removeAttribute("open")));
+
+    selectFirm(selectedFirm);
+    renderCompanyCounts();
+    renderQualityMetrics();
+  </script>
+</body>
+</html>

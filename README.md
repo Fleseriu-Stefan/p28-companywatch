@@ -1,11 +1,29 @@
 # P28 — CompanyWatch
 
-Proiect Tehnologii Web II: ETL + API + Dashboard. M1 implementează fundația
-tehnică: FastAPI, MySQL, migrări Alembic, Docker Compose, structură React cu
-TypeScript/Vite, teste și CI. M2 adaugă pipeline ETL, snapshoturi minimale și diff
-SQL, verificate cu date sintetice. Nu s-au importat încă date reale și nu există dashboard.
+Proiect Tehnologii Web II: ETL + API + Dashboard pentru consultarea și compararea
+datelor publice ONRC din ediții succesive. Contabilul intervievat a descris o
+problemă recurentă: verificarea unui posibil partener cere consultarea mai multor
+surse și compararea manuală a informațiilor. Nu există un caz verificat pentru o
+companie sau o tranzacție anume. Vezi [interviul documentat](INTERVIEW.md).
 
-M1 și M2 sunt integrate în `main`, iar verificările GitHub Actions au trecut.
+În demonstrația propusă de proprietarul proiectului, vizitatorul caută o firmă
+după denumire sau CUI, unde câmpul este verificat, alege rezultatul corect și vede
+profilul public și comparația dintre două ediții pe aceeași pagină. Comparația
+arată sursa și data fiecărei ediții, tipul modificării și valorile anterioare și
+curente. Interfața distinge informațiile neschimbate, valorile indisponibile și
+absența firmei dintr-o ediție. Contabilul va valida acest flux după implementare.
+
+[Cerințele obligatorii P28 și generale](docs/P28-REQUIREMENTS.md) cuprind matricea
+de trasabilitate, criteriile de acceptare și etapele rămase. Exporturile CSV/XLSX,
+accesul API, autentificarea și istoricul sunt în scop. Analiza financiară
+multianuală din surse suplimentare, verificările fiscale sau TVA, notificările
+automate și integrarea cu programe de contabilitate comerciale sunt excluse.
+
+M1, M2 și M2.1 sunt integrate în `main`. M1 asigură fundația Docker, FastAPI,
+MySQL, Alembic, React/TypeScript/Vite, teste și CI. M2 adaugă ETL versionat,
+publicare cu aprobare și diff SQL, verificate cu date sintetice. M2.1 adaugă
+comparații consultative ale rapoartelor de calitate și acoperire pentru deriva
+schemei. Importul integral de date reale și dashboard-ul rămân de realizat.
 Vezi [verificarea M1](docs/M1-VERIFICATION.md) și
 [verificarea M2](docs/M2-VERIFICATION.md).
 
@@ -17,6 +35,20 @@ Ghidul M2, limitele și pașii pentru un import real viitor sunt în
 [docs/M2-ETL.md](docs/M2-ETL.md). [DATA.md](DATA.md) rezumă proveniența,
 eșantioanele verificate și limitele datelor. Protocolul de măsurare pe date
 sintetice este în [docs/M2.1-BENCHMARK.md](docs/M2.1-BENCHMARK.md).
+
+## Stack și arhitectură
+
+- **Frontend** — React, TypeScript și Vite.
+- **Backend** — Python și FastAPI.
+- **Persistență** — MySQL, SQLAlchemy și PyMySQL, cu migrări Alembic.
+- **Servicii locale** — Docker Compose.
+
+Serviciul de migrare pregătește baza MySQL înainte de pornirea API-ului. ETL-ul
+validează datele și pregătește snapshoturile în MySQL, apoi le publică numai
+după aprobare explicită. Frontendul are deocamdată infrastructura de build.
+Vezi [stackul aprobat în D-003](docs/agents/DECISIONS.md#d-003--companywatch-technical-stack),
+[diagrama serviciilor Docker](docs/agents/ARCHITECTURE.md#m1-runtime-and-m2-components)
+și [diagrama fluxului de import și publicare](docs/agents/ARCHITECTURE.md#m2-ingest-and-publication).
 
 ## Cerințe de instalare
 

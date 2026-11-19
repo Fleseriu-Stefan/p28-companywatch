@@ -1,3 +1,15 @@
 # Screens and shared components are added only from confirmed requirements.
-# No application screens exist yet.
-designs: []
+designs:
+  - id: DS-CW-dashboard
+    kind: screen
+    name: Tablou de bord public
+    status: draft
+    design_ref: mocks/DS-CW-dashboard.html
+    figma_ref: https://www.figma.com/design/JQJkLRJU7hZGPSOFW2tTYq?node-id=10-2
+    states: [populated, first-visit]
+    themes: [light, dark]
+    review_widths: [360, 1440]
+    draft_alternatives:
+      - name: Direcția 2
+        design_ref: mocks/DS-CW-dashboard-v2.html
+        figma_ref: https://www.figma.com/design/JQJkLRJU7hZGPSOFW2tTYq?node-id=28-2
