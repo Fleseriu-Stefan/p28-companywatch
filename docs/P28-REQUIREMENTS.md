@@ -84,7 +84,7 @@ performance and live acceptance rows track their own evidence.
 | Compute dataset differences in SQL | History and performance | MySQL computes counts by category and field. | Implemented | Extend the same SQL path for record details. | Existing MySQL tests and future detailed-diff fixtures. |
 | Preserve old published versions unchanged and queryable | History | Immutable published versions remain available to the ETL diff. | Implemented | Expose prior versions through approved readers. | Prior version remains intact and queryable after later publication. |
 | Validity intervals and entity state at a requested date | History and API | Snapshots carry version IDs and edition dates. | Missing | Add observed validity intervals and the as-of query. | Exact date, between editions, before first edition, and absent entity cases. |
-| Real SQL diff on at least 100,000 records in under 30 seconds | Performance and P28 Definition of Done | A synthetic benchmark protocol exists. | Unverified | Approve the measurement boundary, then measure the authorized real comparison. | Version IDs, input counts, match counts, environment, elapsed time and reproducible command. |
+| Real SQL diff on at least 100,000 records in under 30 seconds | Performance and P28 Definition of Done | Q-010 records the [approved real benchmark protocol](M2.1-BENCHMARK.md#protocol-aprobat-pentru-diff-ul-sql-pe-date-reale). | Unverified | After Q-005 authorization, validate and publish two real editions with at least 100,000 accepted records each, then measure the complete SQL diff. | Version IDs, input counts, match counts, environment, `EXPLAIN ANALYZE`, measured run times and reproducible command. |
 
 ### REST API, roles and security
 

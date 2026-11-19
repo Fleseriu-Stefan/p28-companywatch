@@ -117,6 +117,139 @@ Datele sintetice sunt marcate distinct. Publicarea lor și praguri reduse sunt
 posibile numai în codul de test care optează explicit pentru aceasta; CLI real nu
 oferă opțiuni pentru ocolirea pragului sau publicare sintetică.
 
+### Diff detaliat intern
+
+`with pipeline.diff_details(old_id, new_id) as rows:` permite consumul
+incremental al unui rezultat pentru fiecare EUID din reuniunea a două versiuni
+publicate. Fiecare rezultat are `euid`, `change_type`, `previous`, `current` și
+`changed_fields`. Categoriile sunt `added`, `removed`, `modified` și `unchanged`.
+O parte prezentă conține cele opt câmpuri păstrate. Valoarea `None` pentru
+întreaga parte indică absența firmei. Un câmp cu `None` indică o valoare SQL NULL.
+Numai rândurile modificate au nume de câmpuri schimbate, în ordinea
+`RETAINED`. Ordinea rândurilor este nespecificată.
+
+Argumentele stabilesc direcția comparației. Aceeași versiune produce rânduri
+neschimbate. Inversarea argumentelor schimbă valorile anterioare/curente și
+inversează adăugările și eliminările. Cursorul și conexiunea sunt folosite în
+interiorul blocului `with`. Comanda `etl diff` continuă să returneze totalurile.
+
+### Pornirea unui MySQL izolat pentru verificări
+
+Rulează din rădăcina proiectului într-un shell Bash dedicat, cu Python 3,
+Docker activ și Compose. Alege `CHECK_KIND=volume` pentru date sintetice sau
+`CHECK_KIND=benchmark` pentru un proiect dedicat benchmarkului real, după
+autorizarea Q-005. Comenzile generează credențiale numai în mediul shellului.
+Păstrează același shell cât timp lucrezi cu volumul.
+
+```bash
+set -euo pipefail
+set +x
+docker version
+docker compose version
+CHECK_KIND=volume
+case "$CHECK_KIND" in
+  volume) PROJECT_PREFIX=companywatch-check ;;
+  benchmark) PROJECT_PREFIX=companywatch-bench ;;
+  *) exit 2 ;;
+esac
+BENCHMARK_PROJECT="$PROJECT_PREFIX-$(python3 -c 'import secrets; print(secrets.token_hex(8))')"
+export COMPOSE_PROJECT_NAME="$BENCHMARK_PROJECT"
+export MYSQL_DATABASE=companywatch_test MYSQL_USER=companywatch_test
+export MYSQL_PASSWORD="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export MYSQL_ROOT_PASSWORD="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export COMPANYWATCH_M2_MIGRATE=1
+CHECK_VOLUME="${BENCHMARK_PROJECT}_mysql_data"
+compose_check() {
+  docker compose --env-file .env.example -f compose.yaml -p "$BENCHMARK_PROJECT" "$@"
+}
+existing_containers=$(docker ps -aq --filter "label=com.docker.compose.project=$BENCHMARK_PROJECT")
+existing_volumes=$(docker volume ls --format '{{.Name}}')
+existing_networks=$(docker network ls --format '{{.Name}}')
+if [[ -n "$existing_containers" ]] ||
+   grep -Fxq "$CHECK_VOLUME" <<<"$existing_volumes" ||
+   grep -Fxq "${BENCHMARK_PROJECT}_default" <<<"$existing_networks"; then
+  echo "Proiectul, volumul sau rețeaua există deja." >&2
+  exit 1
+fi
+verify_check_mount() {
+  local container mount owner
+  container=$(compose_check ps -q db) || return 1
+  test -n "$container" || return 1
+  mount=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}} {{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Type}} {{.Name}}{{end}}{{end}}' "$container") || return 1
+  owner=$(docker volume inspect --format '{{index .Labels "com.docker.compose.project"}} {{index .Labels "com.docker.compose.volume"}}' "$CHECK_VOLUME") || return 1
+  test "$mount" = "$BENCHMARK_PROJECT volume $CHECK_VOLUME" &&
+    test "$owner" = "$BENCHMARK_PROJECT mysql_data"
+}
+compose_check config --quiet
+compose_check build api
+compose_check up -d --wait --wait-timeout 180 db
+verify_check_mount
+compose_check run --rm --no-deps migrate
+```
+
+Serviciul `tests` se conectează la `db:3306` prin rețeaua proiectului, cu
+utilizatorul aplicației. Păstrează verificarea de izolare înainte de test,
+benchmark și curățare. La final, elimină volumul temporar numai dacă
+`verify_check_mount` reușește, apoi rulează
+`compose_check down --volumes --timeout 5`. Reține volumul dedicat cât timp
+ai nevoie de edițiile autorizate. Volumele de dezvoltare și cel M1 sunt în
+afara acestei proceduri.
+
+### Verificarea sintetică de volum
+
+În proiectul `companywatch-check-*` pregătit mai sus, rulează testul separat de
+`python3 scripts/verify.py` și de CI obișnuit:
+
+```bash
+verify_check_mount
+compose_check run --rm --no-deps -e COMPANYWATCH_DIFF_VOLUME=1 tests pytest -q -s \
+  tests/test_etl_database.py::test_diff_details_two_large_published_editions
+```
+
+Testul generează și publică două ediții sintetice de câte 100.001 rânduri
+acceptate. Verifică toate totalurile și reingestia identică, afișează durata
+consumului complet cu timeoutul aplicației, vârful alocărilor Python măsurat
+separat cu `tracemalloc` și planul integral `EXPLAIN ANALYZE`. Alocările
+Python măsurate exclud RSS-ul și memoria MySQL. CI păstrează verificarea
+existentă pentru o singură ediție și testele de diff cu seturi mici.
+
+### Benchmark pe ediții reale publicate
+
+Folosește proiectul `companywatch-bench-*` pregătit mai sus numai după
+autorizarea separată a validării și publicării. Confirmă două ediții reale
+distincte publicate cu cel puțin 100.000 de rânduri acceptate fiecare și
+setează `OLD_VERSION` și `NEW_VERSION` la ID-urile lor. Activează
+instrumentarea pe instanța izolată și permite citirea datelor de măsurare
+utilizatorului proiectului:
+
+```bash
+verify_check_mount
+compose_check exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root' <<'SQL'
+UPDATE performance_schema.setup_consumers SET ENABLED = 'YES'
+WHERE NAME IN ('global_instrumentation', 'thread_instrumentation',
+               'events_statements_current', 'events_statements_history');
+UPDATE performance_schema.setup_instruments SET ENABLED = 'YES', TIMED = 'YES'
+WHERE NAME = 'statement/sql/select';
+GRANT SELECT ON performance_schema.threads TO 'companywatch_test'@'%';
+GRANT SELECT ON performance_schema.events_statements_history TO 'companywatch_test'@'%';
+SQL
+compose_check run --rm --no-deps tests \
+  python -m tests.benchmark_etl_diff "$OLD_VERSION" "$NEW_VERSION"
+```
+
+Performance Schema trebuie să fie pornit, cu istoric per fir disponibil.
+Runnerul verifică existența unui eveniment complet și temporizat pentru
+instrucțiunea de detaliu la fiecare rulare. Derulează o încălzire și trei
+rulări complete. Raportează separat timpul instrucțiunii MySQL și timpul
+monotonic până la ultimul rând mapat în Python. Un timeout de citire de 120 s
+se aplică numai conexiunilor runnerului. Raportul include volumele, totalurile
+reconciliate, rulările care ating sau depășesc 30 s și `EXPLAIN ANALYZE`.
+Consemnează și comanda, revizia și starea codului, digestul imaginii MySQL,
+versiunile Docker/Compose, resursele hostului și limitele containerelor,
+împreună cu setările instrumentării. Păstrează doar rezultate agregate și
+metadate. Durata reală rămâne de verificat conform
+[protocolului Q-010](M2.1-BENCHMARK.md#protocol-aprobat-pentru-diff-ul-sql-pe-date-reale).
+
 ## Compararea rapoartelor de calitate
 
 `etl quality-compare OLD_VERSION NEW_VERSION` citește două versiuni alese
