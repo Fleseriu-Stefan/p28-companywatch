@@ -1,6 +1,11 @@
+import os
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
+from datetime import UTC, datetime
 from threading import Event
 from time import monotonic, sleep
+from tracemalloc import get_traced_memory, start, stop
 
 import pytest
 from sqlalchemy import event, func, select, text, update
@@ -9,7 +14,7 @@ from sqlalchemy.exc import OperationalError
 from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
 from app.etl.service import PROFILE_VERSION, Pipeline, digest_json, file_hash
-from app.etl.source import HEADER
+from app.etl.source import HEADER, RETAINED
 from tests.etl_fixtures import csv_file, row, source
 
 pytestmark = pytest.mark.integration
@@ -333,6 +338,253 @@ def test_sql_diff_is_null_safe_and_case_sensitive(pipeline, tmp_path):
     assert result["unchanged"] == 1
     assert result["by_field"]["locality"] == 1
     assert result["by_field"]["name"] == 1
+
+
+@pytest.fixture
+def diff_editions(pipeline, tmp_path, request):
+    old_rows = [
+        row(850, ADR_LOCALITATE="", ADR_JUDET=""),
+        row(851, CUI="", ADR_LOCALITATE=""),
+        row(852),
+        row(853, ADR_LOCALITATE=""),
+        row(855),
+    ]
+    new_rows = [
+        row(850, ADR_LOCALITATE="LOC NOU", ADR_JUDET=""),
+        row(851, CUI="", ADR_LOCALITATE="", DENUMIRE="exemplu sintetic 851 srl"),
+        row(854, CUI=old_rows[2]["CUI"]),
+        row(853, ADR_LOCALITATE=""),
+        row(855, ADR_LOCALITATE="", ADR_JUDET="JUDET NOU"),
+    ]
+    old_source = replace(source(), resource_id=f"{request.node.name}-old")
+    new_source = replace(source("2026-11-04"), resource_id=f"{request.node.name}-new")
+    old = pipeline.ingest(csv_file(tmp_path / "old.csv", old_rows), old_source)
+    new = pipeline.ingest(csv_file(tmp_path / "new.csv", new_rows), new_source)
+    return old, new, old_rows, new_rows
+
+
+def expected_side(record):
+    return {name: record[column] or None for column, name in RETAINED.items()}
+
+
+def check_diff_totals(pipeline, old, new, categories, fields, old_count, new_count):
+    totals = pipeline.diff(old, new)
+    assert {category: totals[category] for category in categories} == categories
+    assert totals["by_field"] == {
+        name: fields[name] for name in RETAINED.values() if name != "euid"
+    }
+    matched = totals["modified"] + totals["unchanged"]
+    assert totals["removed"] + matched == old_count
+    assert totals["added"] + matched == new_count
+    assert sum(categories.values()) == old_count + new_count - matched
+
+
+def test_diff_details_values_and_totals(pipeline, diff_editions):
+    old, new, old_rows, new_rows = diff_editions
+    publish(pipeline, old)
+    publish(pipeline, new)
+    expected = {
+        old_rows[0]["EUID"]: ("modified", old_rows[0], new_rows[0], ("locality",)),
+        old_rows[1]["EUID"]: ("modified", old_rows[1], new_rows[1], ("name",)),
+        old_rows[2]["EUID"]: ("removed", old_rows[2], None, ()),
+        new_rows[2]["EUID"]: ("added", None, new_rows[2], ()),
+        old_rows[3]["EUID"]: ("unchanged", old_rows[3], new_rows[3], ()),
+        old_rows[4]["EUID"]: ("modified", old_rows[4], new_rows[4], ("county", "locality")),
+    }
+    with pipeline.diff_details(old, new) as details:
+        rows = list(details)
+    assert len(rows) == len(expected)
+    assert {entry["euid"]: entry for entry in rows} == {
+        euid: {
+            "euid": euid,
+            "change_type": category,
+            "previous": expected_side(previous) if previous is not None else None,
+            "current": expected_side(current) if current is not None else None,
+            "changed_fields": fields,
+        }
+        for euid, (category, previous, current, fields) in expected.items()
+    }
+    check_diff_totals(
+        pipeline,
+        old,
+        new,
+        Counter(entry["change_type"] for entry in rows),
+        Counter(field for entry in rows for field in entry["changed_fields"]),
+        len(old_rows),
+        len(new_rows),
+    )
+
+
+def test_diff_details_binary_euid_and_all_field_flags(pipeline):
+    # The production CSV profile rejects case-only EUID variants and ties registration to EUID.
+    # Seed synthetic published rows directly to exercise the storage comparison independently.
+    old, new = "binary-diff-old", "binary-diff-new"
+    fields = tuple(name for name in RETAINED.values() if name != "euid")
+    with pipeline.engine.begin() as connection:
+        for version, edition, key, value in (
+            (old, "2026-10-19", "Binary-Key", "A"),
+            (new, "2026-11-04", "binary-key", "a"),
+        ):
+            connection.execute(
+                versions.insert().values(
+                    id=version,
+                    edition=edition,
+                    resource_id=version,
+                    source_url="synthetic",
+                    license="synthetic",
+                    source_kind="synthetic",
+                    sha256="0" * 64,
+                    profile=PROFILE_VERSION,
+                    schema_hash="0" * 64,
+                    state="published",
+                    created_at=datetime.now(UTC).replace(tzinfo=None),
+                    manifest={},
+                )
+            )
+            connection.execute(
+                companies.insert(),
+                [
+                    {"version_id": version, "euid": key, **dict.fromkeys(fields, None)},
+                    {"version_id": version, "euid": "same-key", **dict.fromkeys(fields, value)},
+                ],
+            )
+    with pipeline.diff_details(old, new) as details:
+        rows = {entry["euid"]: entry for entry in details}
+    assert rows.keys() == {"Binary-Key", "binary-key", "same-key"}
+    assert rows["Binary-Key"]["change_type"] == "removed"
+    assert rows["binary-key"]["change_type"] == "added"
+    assert rows["same-key"]["change_type"] == "modified"
+    assert rows["same-key"]["changed_fields"] == fields
+    assert rows["same-key"]["previous"] == {"euid": "same-key", **dict.fromkeys(fields, "A")}
+    assert rows["same-key"]["current"] == {"euid": "same-key", **dict.fromkeys(fields, "a")}
+
+
+def test_diff_details_version_guards_and_orientation(pipeline, diff_editions):
+    old, new, old_rows, _ = diff_editions
+    publish(pipeline, old)
+    with pytest.raises(ETLError, match="^published_versions_required$"):
+        with pipeline.diff_details(old, new):
+            pytest.fail("review version was exposed")
+    approval = pipeline.approve(new, pipeline.report(new)["report_hash"])
+    with pytest.raises(ETLError, match="^published_versions_required$"):
+        with pipeline.diff_details(old, new):
+            pytest.fail("unpublished approved version was exposed")
+    pipeline.publish(new, approval)
+    with pytest.raises(ETLError, match="^published_versions_required$"):
+        with pipeline.diff_details("missing", new):
+            pytest.fail("missing version was accepted")
+    guarded = Pipeline(pipeline.engine)
+    with pytest.raises(ETLError, match="^synthetic_not_allowed$"):
+        with guarded.diff_details(old, new):
+            pytest.fail("synthetic versions were exposed without opt-in")
+    with pipeline.diff_details(old, old) as details:
+        same = list(details)
+    assert len(same) == len(old_rows)
+    assert {entry["euid"] for entry in same} == {record["EUID"] for record in old_rows}
+    assert all(
+        entry["change_type"] == "unchanged"
+        and entry["previous"] == entry["current"]
+        and entry["changed_fields"] == ()
+        for entry in same
+    )
+    with pipeline.diff_details(old, new) as details:
+        forward = {entry["euid"]: entry for entry in details}
+    with pipeline.diff_details(new, old) as details:
+        reverse = {entry["euid"]: entry for entry in details}
+    assert forward.keys() == reverse.keys()
+    opposite = {
+        "added": "removed",
+        "removed": "added",
+        "modified": "modified",
+        "unchanged": "unchanged",
+    }
+    for euid, entry in forward.items():
+        assert reverse[euid] == {
+            "euid": euid,
+            "change_type": opposite[entry["change_type"]],
+            "previous": entry["current"],
+            "current": entry["previous"],
+            "changed_fields": entry["changed_fields"],
+        }
+
+
+def test_diff_details_releases_cursor_and_connection(pipeline, diff_editions):
+    old, new, _, _ = diff_editions
+    publish(pipeline, old)
+    publish(pipeline, new)
+    pool = pipeline.engine.pool
+    with pipeline.diff_details(old, new) as details:
+        assert pool.checkedout() == 1
+        assert len(list(details)) == 6
+    assert pool.checkedout() == 0
+    with pipeline.diff_details(old, new) as details:
+        next(details)
+    assert pool.checkedout() == 0
+    with pytest.raises(RuntimeError, match="^synthetic_consumer_error$"):
+        with pipeline.diff_details(old, new) as details:
+            next(details)
+            raise RuntimeError("synthetic_consumer_error")
+    assert pool.checkedout() == 0
+    with pipeline.engine.connect() as connection:
+        assert connection.scalar(text("SELECT 1")) == 1
+
+
+@pytest.mark.skipif(
+    os.getenv("COMPANYWATCH_DIFF_VOLUME") != "1", reason="run the opt-in two-edition volume check"
+)
+def test_diff_details_two_large_published_editions(engine, tmp_path):
+    pipeline = Pipeline(engine, allow_synthetic=True)
+    old_path = csv_file(tmp_path / "volume-old.csv", (row(i) for i in range(1, 100002)))
+    new_path = csv_file(
+        tmp_path / "volume-new.csv",
+        (row(i, DENUMIRE="SYNTHETIC CHANGED NAME") if i == 2 else row(i) for i in range(2, 100003)),
+    )
+    old_source, new_source = source(), source("2026-11-04")
+    old = pipeline.ingest(old_path, old_source)
+    new = pipeline.ingest(new_path, new_source)
+    for version in (old, new):
+        assert pipeline.report(version)["report"]["accepted_records"] == 100001
+        publish(pipeline, version)
+    assert pipeline.ingest(old_path, old_source) == old
+    assert pipeline.ingest(new_path, new_source) == new
+
+    categories, fields = Counter(), Counter()
+    detail_sql = []
+
+    def capture_sql(connection, cursor, statement, parameters, context, executemany):
+        if "UNION ALL" in statement:
+            detail_sql.append((statement, parameters))
+
+    event.listen(engine, "before_cursor_execute", capture_sql)
+    try:
+        started = monotonic()
+        with pipeline.diff_details(old, new) as details:
+            for entry in details:
+                categories[entry["change_type"]] += 1
+                fields.update(entry["changed_fields"])
+        elapsed = monotonic() - started
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_sql)
+
+    assert categories == {"added": 1, "removed": 1, "modified": 1, "unchanged": 99999}
+    assert sum(categories.values()) == 100002
+    assert fields == {"name": 1}
+    check_diff_totals(pipeline, old, new, categories, fields, 100001, 100001)
+
+    start()
+    try:
+        with pipeline.diff_details(old, new) as details:
+            assert sum(1 for _ in details) == 100002
+        _, peak = get_traced_memory()
+    finally:
+        stop()
+    print(f"Accepted per edition: 100001. Categories: {dict(categories)}. Fields: {dict(fields)}.")
+    print(f"Complete detail stream: {elapsed:.3f}s with default timeouts.")
+    print(f"Python peak: {peak} bytes.")
+
+    [(statement, parameters)] = detail_sql
+    with engine.connect() as connection:
+        print(connection.exec_driver_sql(f"EXPLAIN ANALYZE {statement}", parameters).scalar_one())
 
 
 def test_publication_rolls_back_and_concurrent_versions_are_whole(pipeline, tmp_path, monkeypatch):

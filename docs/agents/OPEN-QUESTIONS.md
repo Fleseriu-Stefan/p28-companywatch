@@ -18,7 +18,7 @@
 - Q-007 · Where and how should the public deployment run?
 - Q-008 · Can the verified legal-entity subset be extended?
 - Q-009 · How often should scheduled ETL check for ONRC updates?
-- Q-010 · How should the real SQL diff benchmark be measured?
+- Q-010 · How should the real SQL diff benchmark be measured? · _answered_
 - Q-011 · What API request limits and quotas should apply?
 - Q-012 · Can the accountant supply a verified, anonymized example if needed?
 
@@ -78,10 +78,10 @@
 - **Proposed answer:** Match the verified publication cadence with the simplest configurable interval. Consider a daily check only if the cadence is unclear. Skip unnecessary downloads for unchanged sources and retain idempotent processing and guarded publication.
 
 ## Q-010 · How should the real SQL diff benchmark be measured?
-- **Status:** open
-- **Blocks:** Final benchmark protocol and evidence.
+- **Status:** answered
 - **Who answers:** Project owner.
-- **Proposed answer:** Identify the two published versions, input sizes and match counts. Record the measurement boundary, environment, elapsed time and reproducible command. Demonstrate a SQL diff on at least 100,000 real records in under 30 seconds after authorization.
+- **Answer:** On 2026-11-19 the owner approved timing the complete per-company SQL diff separately from Python result-stream consumption. Use two published real ONRC editions with at least 100,000 accepted legal-entity records each. Warm up, record at least three complete timed runs with an under-30-second SQL target, and preserve every timing, the `EXPLAIN ANALYZE` output, the environment and the reproducible command. [Approved benchmark protocol](../M2.1-BENCHMARK.md#protocol-aprobat-pentru-diff-ul-sql-pe-date-reale).
+- **Evidence pending:** The benchmark has yet to be run. Q-005 still gates real validation and publication.
 
 ## Q-011 · What API request limits and quotas should apply?
 - **Status:** open
