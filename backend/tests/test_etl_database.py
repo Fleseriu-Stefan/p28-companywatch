@@ -11,12 +11,12 @@ import pytest
 from sqlalchemy import event, func, select, text, update
 from sqlalchemy.exc import OperationalError
 
-from app.config import Settings
 from app.db import create_database_engine
 from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
 from app.etl.service import PROFILE_VERSION, Pipeline, digest_json, file_hash
 from app.etl.source import HEADER, RETAINED
+from tests.conftest import isolated_test_settings
 from tests.etl_fixtures import csv_file, row, source
 
 pytestmark = pytest.mark.integration
@@ -29,7 +29,7 @@ def pipeline(engine):
 
 @pytest.fixture
 def ingest_engine():
-    configured = create_database_engine(Settings.from_env(), read_timeout=120)
+    configured = create_database_engine(isolated_test_settings(), read_timeout=120)
     yield configured
     configured.dispose()
 
@@ -702,13 +702,9 @@ def test_abandoned_loading_version_is_safely_recovered(pipeline, tmp_path):
         )
 
 
-def test_ingest_connection_can_read_after_more_than_two_seconds():
-    ingest_engine = create_database_engine(Settings.from_env(), read_timeout=120)
-    try:
-        with ingest_engine.connect() as connection:
-            assert connection.scalar(text("SELECT SLEEP(3)")) == 0
-    finally:
-        ingest_engine.dispose()
+def test_ingest_connection_can_read_after_more_than_two_seconds(ingest_engine):
+    with ingest_engine.connect() as connection:
+        assert connection.scalar(text("SELECT SLEEP(3)")) == 0
 
 
 def test_duplicate_aggregation_disconnect_preserves_pointer_and_recovers(
@@ -719,7 +715,7 @@ def test_duplicate_aggregation_disconnect_preserves_pointer_and_recovers(
     )
     publish(pipeline, current)
     artifact = csv_file(tmp_path / "disconnect-during-duplicates.csv", [row(9702)])
-    ingest_engine = create_database_engine(Settings.from_env(), read_timeout=120)
+    ingest_engine = create_database_engine(isolated_test_settings(), read_timeout=120)
     ingest_pipeline = Pipeline(ingest_engine, minimum_rows=1, allow_synthetic=True)
     killed = False
 

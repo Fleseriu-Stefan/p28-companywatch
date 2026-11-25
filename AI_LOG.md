@@ -1,5 +1,50 @@
 # AI log
 
+## 2026-11-25 · PR #6 Section G specialist review fix
+
+The independent Performance Specialist and SEO/GEO Expert found no actionable
+issues in PR #6. The Security Engineer found a P1 integration-test isolation
+regression: the new `ingest_engine` fixture and the standalone timeout test could
+bypass the shared `engine` fixture's development-database guard. In a manually
+selected integration test, the 100,001-row synthetic test could then ingest and
+publish against an unsafe configured database. The owner approved this focused
+review fix, without authorizing a commit, push, merge, real ingestion or publication.
+
+Test first: added a mock-only regression for an unsafe database name and an unsafe
+Compose project name. It replaces engine creation with a mock, so neither case
+contacts a database. `docker build --pull=false --tag
+companywatch-m2-2-isolation:red ./backend` succeeded; `docker run --rm --network
+none companywatch-m2-2-isolation:red pytest -q --tb=short
+tests/test_etl_test_isolation.py` produced the expected RED result: both cases
+failed with `DID NOT RAISE Failed`, proving the ingest fixture accepted the unsafe
+settings. No connection was opened.
+
+The correction extracts the existing guard into `isolated_test_settings()` in
+`backend/tests/conftest.py`, returning the exact checked settings object. Both the
+default and 120-second ingest engines use that object; the standalone read-timeout
+test now requests the guarded ingest fixture. The duplicate-disconnect regression's
+separate ingest engine also uses the same guard. No application code, ETL behavior,
+existing assertion or timeout value changed. A rebuilt network-disabled image ran
+the focused isolation, engine-timeout and CLI-timeout tests: 10 passed in 0.55 s.
+
+The first `python3 scripts/verify.py` run stopped at Ruff lint because one existing
+integration test still used `Settings` after its import was removed. The second
+stopped at Ruff format on the new test's function signature. Both stopped before
+MySQL startup, and their fresh verification projects were cleaned up. After those
+mechanical corrections, `docker run --rm --network none
+companywatch-m2-2-isolation:final ruff check .` returned `All checks passed!` and
+`ruff format --check .` reported 35 files formatted. The final
+`python3 scripts/verify.py` used fresh project
+`companywatch-check-60f4ec7ccdfec73d`, verified its disposable configuration
+and database-volume ownership, and exited 0 with `M1/M2 verification passed`:
+74 non-integration passes, 1 baseline MySQL pass, 29 other MySQL integration
+passes, and 1 opt-in volume test skipped. Frontend lint/typecheck/build, protected
+tmpfs, startup gates, outage/recovery and persistence checks passed. The verifier
+checked the volume mount and ownership before removing only its own resources.
+The development and retained benchmark volumes were not selected or modified.
+`python3 docs/agents/tools/ledger-lint.py` returned `✓ ledger ok`, and
+`git diff --check` passed. Q-005 and real-data validation remain open.
+
 ## 2026-11-25 · M2.2 ETL read-timeout reliability build
 
 The owner approved the focused M2.2 plan and explicitly authorized this build,
