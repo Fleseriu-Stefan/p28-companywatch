@@ -72,7 +72,8 @@ def main(argv=None):
             return 2
     engine = None
     try:
-        engine = create_database_engine(Settings.from_env())
+        engine_kwargs = {"read_timeout": 120} if args.command == "ingest" else {}
+        engine = create_database_engine(Settings.from_env(), **engine_kwargs)
         pipeline = Pipeline(engine)
         if args.command == "ingest":
             source = SOURCES[args.edition]

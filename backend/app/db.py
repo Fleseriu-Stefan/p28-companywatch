@@ -16,7 +16,7 @@ def migration_config() -> Config:
     return config
 
 
-def create_database_engine(settings: Settings) -> Engine:
+def create_database_engine(settings: Settings, *, read_timeout: int = 2) -> Engine:
     return create_engine(
         settings.url,
         pool_pre_ping=True,
@@ -24,7 +24,7 @@ def create_database_engine(settings: Settings) -> Engine:
         max_overflow=0,
         pool_timeout=2,
         hide_parameters=True,
-        connect_args={"connect_timeout": 2, "read_timeout": 2, "write_timeout": 2},
+        connect_args={"connect_timeout": 2, "read_timeout": read_timeout, "write_timeout": 2},
     )
 
 

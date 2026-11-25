@@ -1,5 +1,79 @@
 # AI log
 
+## 2026-11-25 · M2.2 ETL read-timeout reliability build
+
+The owner approved the focused M2.2 plan and explicitly authorized this build,
+but not another ONRC download, real ingestion, approval, publication, diff
+benchmark, commit, push, or merge. D-001, D-003–D-009, C-001/C-002 and
+Q-005/Q-010 were confirmed; Q-005 remains investigating. PATTERN-001/002
+remain candidate-only. `git fetch --all --prune` and `git pull --ff-only`
+succeeded (`Already up to date`); the clean main revision was
+`50c2be09a384d05f6c96c7c66525532631ac9f6f`. Created branch
+`fix/m2-2-etl-read-timeout` from that revision.
+
+The isolated October diagnostic had staged 4,229,451 rows before
+`count_duplicate_groups` lost its connection after 2005.2 ms with driver code
+2013. MySQL remained healthy; the version and attempt stayed `loading`, no
+company rows were prepared, and the publication pointer remained NULL. A
+separate read-only aggregation under a 120 s session limit returned 4,713
+duplicate groups in 23.16 s wall time, including client startup. The existing
+index was used for a covering range scan, followed by a temporary table. The
+measurement exceeds the old 2 s PyMySQL read timeout; it is not a completed
+quality report or a real SQL diff measurement.
+
+Tests were written before the implementation. Commands and outcomes:
+
+- `docker build --pull=false --tag companywatch-m2-2-tests:red ./backend`
+  succeeded. `docker run --rm --network none companywatch-m2-2-tests:red pytest
+  -q tests/test_db_timeout.py tests/test_etl_cli_timeout.py` first produced
+  6 failures and 2 passes. Four failures were a non-serializable test mock;
+  corrected that setup without changing assertions.
+- Rebuilt the red image with the same command. `docker run --rm --network none
+  companywatch-m2-2-tests:red pytest -q --tb=short tests/test_db_timeout.py
+  tests/test_etl_cli_timeout.py` then produced the intended 2 failures and
+  6 passes: the engine rejected `read_timeout`, and ingest did not select 120 s.
+- Added a keyword-only engine read timeout with a 2 s default and passed 120 s
+  only for `etl ingest`. Connect, write and pool timeouts remain 2 s; other
+  commands and API readiness use the default. `docker build --pull=false
+  --tag companywatch-m2-2-tests:green ./backend` succeeded; `docker run
+  --rm --network none companywatch-m2-2-tests:green pytest -q --tb=short
+  tests/test_db_timeout.py tests/test_etl_cli_timeout.py` returned
+  8 passes in 0.27 s.
+- `docker run --rm --network none companywatch-m2-2-tests:green ruff check .`
+  first reported three E501 lines, and `docker run --rm --network none
+  companywatch-m2-2-tests:green ruff format --check .` reported one unformatted
+  integration test. Adjusted only line wrapping; no assertions changed.
+- `python3 docs/agents/tools/ledger-lint.py --fix` and then without `--fix`
+  each returned `✓ ledger ok`. `python3 scripts/verify.py` first used a fresh
+  `companywatch-check-b5bd69d002c92635` project. Unit, Ruff and frontend
+  checks passed; MySQL integration had 28 passes, 1 skip and 1 failure. The
+  existing 100,001-row synthetic test used the default 2 s engine directly,
+  and `copy_prepared_rows` disconnected after 2001.7 ms. The verifier proved
+  ownership before removing its own test volume.
+- Changed only that existing test's engine setup to the ingest-configured 120 s
+  engine, preserving every assertion. A second `python3 scripts/verify.py`
+  used fresh `companywatch-check-fe869b80d06462f1` resources and exited 0:
+  72 non-integration passes; 1 baseline MySQL pass; 29 other MySQL integration
+  passes and 1 opt-in volume skip. Ruff, frontend lint/typecheck/build,
+  protected tmpfs, startup gates, outage/recovery and persistence checks
+  passed. The verifier checked the mount and volume labels before cleanup and
+  reported `M1/M2 verification passed`.
+
+The new MySQL regressions cover an ingest-configured `SELECT SLEEP(3)`,
+connection invalidation during duplicate-group aggregation, unchanged
+publication, lock-protected rebuilding of an abandoned attempt, and 20,006
+high-cardinality synthetic source rows with reconciled duplicate counts. No
+ONRC data was downloaded or ingested in this build. The development volume
+`companywatch_mysql_data` and retained benchmark volume
+`companywatch-bench-3458f6c9bd974af5_mysql_data` were never selected for
+tests or cleanup. Real validation, real publication and the under-30-second
+real SQL diff remain unverified under Q-005. Final read-only `docker volume
+inspect` confirmed both preserved volume names and project labels. Separate
+`docker ps -a --filter label=com.docker.compose.project=...` and
+`docker volume ls --filter label=com.docker.compose.project=...` checks found
+no remaining resources in either temporary verification project. `git diff
+--check` and ledger lint passed. No commit, push or merge was made.
+
 ## 2026-11-19 · Lab 1 Section G PR review correction
 
 After independent review of PR #5, the owner approved one low-severity

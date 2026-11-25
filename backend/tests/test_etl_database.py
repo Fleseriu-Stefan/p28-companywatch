@@ -11,6 +11,8 @@ import pytest
 from sqlalchemy import event, func, select, text, update
 from sqlalchemy.exc import OperationalError
 
+from app.config import Settings
+from app.db import create_database_engine
 from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
 from app.etl.service import PROFILE_VERSION, Pipeline, digest_json, file_hash
@@ -23,6 +25,13 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 def pipeline(engine):
     return Pipeline(engine, minimum_rows=1, allow_synthetic=True)
+
+
+@pytest.fixture
+def ingest_engine():
+    configured = create_database_engine(Settings.from_env(), read_timeout=120)
+    yield configured
+    configured.dispose()
 
 
 def publish(pipeline, version):
@@ -622,8 +631,8 @@ def test_publication_rolls_back_and_concurrent_versions_are_whole(pipeline, tmp_
         assert count == (2 if current == second else 1)
 
 
-def test_large_synthetic_version_meets_full_publication_threshold(engine, tmp_path):
-    pipeline = Pipeline(engine, allow_synthetic=True)
+def test_large_synthetic_version_meets_full_publication_threshold(ingest_engine, tmp_path):
+    pipeline = Pipeline(ingest_engine, allow_synthetic=True)
     path = csv_file(tmp_path / "synthetic-volume.csv", (row(i) for i in range(1, 100002)))
     version = pipeline.ingest(path, source())
     report = pipeline.report(version)
@@ -632,7 +641,7 @@ def test_large_synthetic_version_meets_full_publication_threshold(engine, tmp_pa
     assert report["report"]["minimum_records"] == 100000
     approval = publish(pipeline, version)
     pipeline.publish(version, approval)
-    with engine.connect() as connection:
+    with ingest_engine.connect() as connection:
         assert (
             connection.scalar(
                 select(func.count()).select_from(companies).where(companies.c.version_id == version)
@@ -690,6 +699,123 @@ def test_abandoned_loading_version_is_safely_recovered(pipeline, tmp_path):
                 select(func.count()).select_from(companies).where(companies.c.version_id == version)
             )
             == 1
+        )
+
+
+def test_ingest_connection_can_read_after_more_than_two_seconds():
+    ingest_engine = create_database_engine(Settings.from_env(), read_timeout=120)
+    try:
+        with ingest_engine.connect() as connection:
+            assert connection.scalar(text("SELECT SLEEP(3)")) == 0
+    finally:
+        ingest_engine.dispose()
+
+
+def test_duplicate_aggregation_disconnect_preserves_pointer_and_recovers(
+    pipeline, tmp_path, caplog
+):
+    current = pipeline.ingest(
+        csv_file(tmp_path / "current-before-disconnect.csv", [row(9701)]), source()
+    )
+    publish(pipeline, current)
+    artifact = csv_file(tmp_path / "disconnect-during-duplicates.csv", [row(9702)])
+    ingest_engine = create_database_engine(Settings.from_env(), read_timeout=120)
+    ingest_pipeline = Pipeline(ingest_engine, minimum_rows=1, allow_synthetic=True)
+    killed = False
+
+    def disconnect_before_duplicate_count(connection, _cursor, statement, *_args):
+        nonlocal killed
+        if not killed and "GROUP BY etl_staging_rows.key_digest" in statement:
+            killed = True
+            session_id = connection.scalar(text("SELECT CONNECTION_ID()"))
+            with ingest_engine.connect() as killer:
+                killer.execute(text(f"KILL CONNECTION {int(session_id)}"))
+
+    event.listen(ingest_engine, "before_cursor_execute", disconnect_before_duplicate_count)
+    try:
+        with pytest.raises(ETLError, match="^ingest_lock_lost$"):
+            ingest_pipeline.ingest(artifact, source("2026-11-04"))
+    finally:
+        event.remove(ingest_engine, "before_cursor_execute", disconnect_before_duplicate_count)
+
+    assert killed
+    assert "operation=count_duplicate_groups outcome=connection_invalidated" in caplog.text
+    with ingest_engine.connect() as connection:
+        failed = connection.scalar(
+            select(versions.c.id).where(versions.c.sha256 == file_hash(artifact))
+        )
+        assert (
+            connection.scalar(select(versions.c.state).where(versions.c.id == failed)) == "loading"
+        )
+        assert connection.scalar(select(publications.c.current_version_id)) == current
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(staging).where(staging.c.version_id == failed)
+            )
+            == 1
+        )
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(companies).where(companies.c.version_id == failed)
+            )
+            == 0
+        )
+    with pytest.raises(ETLError, match="^version_not_reviewable$"):
+        ingest_pipeline.approve(failed, "synthetic-report-hash")
+    with pytest.raises(ETLError, match="^approval_required$"):
+        ingest_pipeline.publish(failed, "synthetic-approval")
+
+    assert ingest_pipeline.ingest(artifact, source("2026-11-04")) == failed
+    assert ingest_pipeline.report(failed)["state"] == "review"
+    with ingest_engine.connect() as connection:
+        assert connection.scalar(select(publications.c.current_version_id)) == current
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(staging).where(staging.c.version_id == failed)
+            )
+            == 0
+        )
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(companies).where(companies.c.version_id == failed)
+            )
+            == 1
+        )
+        assert set(
+            connection.scalars(select(attempts.c.state).where(attempts.c.version_id == failed))
+        ) == {"abandoned", "ready"}
+    ingest_engine.dispose()
+
+
+def test_high_cardinality_duplicate_aggregation_reconciles(pipeline, tmp_path):
+    def items():
+        for number in range(1, 20002):
+            yield row(number)
+        for number in range(1, 5):
+            yield row(number)
+        yield row(5, FORMA_JURIDICA="PFA", COD_INMATRICULARE="F01/5/2020")
+
+    artifact = csv_file(tmp_path / "many-distinct-keys.csv", items())
+    with pipeline.engine.connect() as connection:
+        pointer_before = connection.scalar(select(publications.c.current_version_id))
+    version = pipeline.ingest(artifact, source())
+    report = pipeline.report(version)["report"]
+    assert report["source_records"] == 20006
+    assert report["duplicate_key_groups"] == 5
+    assert report["duplicate_key_records"] == 10
+    assert report["accepted_records"] == 19996
+    assert report["quarantined_records"] == 9
+    assert report["excluded_records"] == 1
+    assert report["source_records"] == (
+        report["accepted_records"] + report["quarantined_records"] + report["excluded_records"]
+    )
+    with pipeline.engine.connect() as connection:
+        assert connection.scalar(select(publications.c.current_version_id)) == pointer_before
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(staging).where(staging.c.version_id == version)
+            )
+            == 0
         )
 
 
