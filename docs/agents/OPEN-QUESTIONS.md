@@ -51,6 +51,7 @@
 - **Who answers:** Project owner, after source investigation.
 - **Partial answer:** User approved the two verified OD_FIRME.CSV editions (19.10.2026 and 04.11.2026) for M2 development, the candidate EUID key, minimal legal-entity fields and temporary protected raw processing. D-006–D-008 and C-002 govern implementation. The owner later explicitly authorized full downloads and isolated ingestion for both approved editions. The October edition was fully downloaded and 4,229,451 source rows were staged, but ingestion failed during duplicate aggregation; no complete quality report or accepted snapshot was produced. The November edition was not downloaded, and no version was published. A new real-ingestion attempt requires separate explicit authorization. The existing development data remains protected. Complete eligible counts and global quality for both editions must be measured before manual publication. See ../ONRC-SOURCE.md.
 - **Still open:** Measure total source rows, eligible legal entities per edition, and real SQL diff input size separately. If the approved editions cannot meet the requirements or the existing publication gate, investigate another official ONRC edition first and present it for separate approval. Keep the approved classification. Full validation still requires explicit authorization.
+- **Confirmed:** 2026-11-25
 
 ## Q-006 · What interview evidence and checkpoint rubric must be delivered?
 - **Status:** investigating
@@ -82,6 +83,7 @@
 - **Who answers:** Project owner.
 - **Answer:** On 2026-11-19 the owner approved timing the complete per-company SQL diff separately from Python result-stream consumption. Use two published real ONRC editions with at least 100,000 accepted legal-entity records each. Warm up, record at least three complete timed runs with an under-30-second SQL target, and preserve every timing, the `EXPLAIN ANALYZE` output, the environment and the reproducible command. [Approved benchmark protocol](../M2.1-BENCHMARK.md#protocol-aprobat-pentru-diff-ul-sql-pe-date-reale).
 - **Evidence pending:** The benchmark has yet to be run. Q-005 still gates real validation and publication.
+- **Confirmed:** 2026-11-25
 
 ## Q-011 · What API request limits and quotas should apply?
 - **Status:** open

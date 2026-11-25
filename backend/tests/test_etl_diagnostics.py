@@ -5,6 +5,7 @@ from pymysql.err import OperationalError as MySQLOperationalError
 from sqlalchemy import Insert
 from sqlalchemy.exc import OperationalError
 
+from app.etl import service
 from app.etl.errors import ETLError
 from app.etl.models import staging
 from app.etl.service import Pipeline, ingest_operation, ingest_transaction
@@ -27,7 +28,7 @@ FAKE_SECRET = "FAKE_SECRET_ETL_DIAGNOSTIC"
     ],
 )
 def test_ingest_database_failure_is_safe_in_pytest_output(
-    tmp_path, caplog, operation, driver_only, invalidated, expected
+    tmp_path, caplog, monkeypatch, operation, driver_only, invalidated, expected
 ):
     driver_code = 2013 if invalidated else 1205
     driver_error = MySQLOperationalError(driver_code, FAKE_SECRET)
@@ -41,6 +42,8 @@ def test_ingest_database_failure_is_safe_in_pytest_output(
     connection = engine.connect.return_value.__enter__.return_value
     connection.invalidated = False
     connection.scalar.return_value = 1
+    generated_ids = iter(("synthetic-version", "synthetic-attempt"))
+    monkeypatch.setattr(service, "uuid4", lambda: next(generated_ids))
     connection.execute.return_value.mappings.return_value.one.return_value = {
         "id": "synthetic-version",
         "state": "loading",

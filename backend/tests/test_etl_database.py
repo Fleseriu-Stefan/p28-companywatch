@@ -8,7 +8,7 @@ from time import monotonic, sleep
 from tracemalloc import get_traced_memory, start, stop
 
 import pytest
-from sqlalchemy import event, func, select, text, update
+from sqlalchemy import event, func, insert, select, text, update
 from sqlalchemy.exc import OperationalError
 
 from app.db import create_database_engine
@@ -700,6 +700,294 @@ def test_abandoned_loading_version_is_safely_recovered(pipeline, tmp_path):
             )
             == 1
         )
+
+
+def seed_interrupted_retry(pipeline, tmp_path, *, rows=2501, other_version=None):
+    artifact = csv_file(tmp_path / "retry-batches.csv", [row(9801, DENUMIRE=tmp_path.name)])
+    version = pipeline.ingest(artifact, source())
+    with pipeline.engine.begin() as connection:
+        connection.execute(update(versions).where(versions.c.id == version).values(state="loading"))
+        connection.execute(
+            update(attempts).where(attempts.c.version_id == version).values(state="loading")
+        )
+        entries = []
+        for number in range(rows):
+            entries.append(
+                dict(
+                    version_id=version,
+                    source_line=number + 2,
+                    valid=True,
+                    excluded=False,
+                    key_digest=f"{number:064x}",
+                    errors=[],
+                )
+            )
+            if other_version is not None:
+                entries.append(
+                    dict(
+                        version_id=other_version,
+                        source_line=number + 2,
+                        valid=True,
+                        excluded=False,
+                        key_digest=f"{number:064x}",
+                        errors=[],
+                    )
+                )
+            if len(entries) >= 1000:
+                connection.execute(insert(staging), entries)
+                entries.clear()
+        if entries:
+            connection.execute(insert(staging), entries)
+    return artifact, version
+
+
+def test_retry_cleanup_batches_are_bounded_and_isolate_interleaved_versions(pipeline, tmp_path):
+    other = pipeline.ingest(csv_file(tmp_path / "other.csv", [row(9802)]), source("2026-11-04"))
+    artifact, version = seed_interrupted_retry(pipeline, tmp_path, other_version=other)
+    deleted = []
+
+    def record_delete(_connection, cursor, statement, *_args):
+        if statement.startswith("DELETE FROM etl_staging_rows"):
+            deleted.append(cursor.rowcount)
+
+    event.listen(pipeline.engine, "after_cursor_execute", record_delete)
+    try:
+        assert pipeline.ingest(artifact, source()) == version
+    finally:
+        event.remove(pipeline.engine, "after_cursor_execute", record_delete)
+
+    assert len(deleted) >= 3
+    assert sum(deleted[:3]) == 2501
+    assert all(0 < count <= 1000 for count in deleted)
+    with pipeline.engine.connect() as connection:
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(staging).where(staging.c.version_id == other)
+            )
+            == 2501
+        )
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(staging).where(staging.c.version_id == version)
+            )
+            == 0
+        )
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(companies).where(companies.c.version_id == version)
+            )
+            == 1
+        )
+
+
+@pytest.fixture
+def empty_publication_pointer(pipeline):
+    with pipeline.engine.begin() as connection:
+        previous = connection.scalar(select(publications.c.current_version_id))
+        connection.execute(update(publications).values(current_version_id=None))
+    try:
+        yield
+    finally:
+        with pipeline.engine.begin() as connection:
+            connection.execute(update(publications).values(current_version_id=previous))
+
+
+@pytest.mark.usefixtures("empty_publication_pointer")
+def test_retry_cleanup_interruption_between_committed_batches_is_recoverable(
+    pipeline, tmp_path, monkeypatch
+):
+    from app.etl import service
+
+    artifact, version = seed_interrupted_retry(pipeline, tmp_path)
+    deletes = 0
+    remaining_staging = (
+        select(func.count()).select_from(staging).where(staging.c.version_id == version)
+    )
+
+    def reject_fresh_parse(_path):
+        pytest.fail(
+            f"Fresh parsing reached after {deletes} retry staging DELETE(s); "
+            "expected a second retry batch after the first committed 1,000 deletions"
+        )
+
+    def interrupt_second_delete(_connection, _cursor, statement, *_args):
+        nonlocal deletes
+        if statement.startswith("DELETE FROM etl_staging_rows"):
+            deletes += 1
+            if deletes == 2:
+                # A separate connection can see only committed cleanup.
+                with pipeline.engine.connect() as observer:
+                    assert observer.scalar(remaining_staging) == 1501
+                raise ETLError("synthetic_cleanup_interrupted")
+
+    with monkeypatch.context() as patches:
+        patches.setattr(service, "records", reject_fresh_parse)
+        event.listen(pipeline.engine, "before_cursor_execute", interrupt_second_delete)
+        try:
+            with pytest.raises(ETLError, match="synthetic_cleanup_interrupted"):
+                pipeline.ingest(artifact, source())
+        finally:
+            event.remove(pipeline.engine, "before_cursor_execute", interrupt_second_delete)
+
+    assert deletes == 2
+    with pipeline.engine.connect() as connection:
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(staging).where(staging.c.version_id == version)
+            )
+            == 1501
+        )
+        assert (
+            connection.scalar(select(versions.c.state).where(versions.c.id == version)) == "loading"
+        )
+        assert (
+            connection.scalar(select(versions.c.report_hash).where(versions.c.id == version))
+            is None
+        )
+        assert connection.scalar(select(publications.c.current_version_id)) is None
+    assert pipeline.ingest(artifact, source()) == version
+    with pipeline.engine.connect() as connection:
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(staging).where(staging.c.version_id == version)
+            )
+            == 0
+        )
+        assert (
+            connection.scalar(
+                select(func.count()).select_from(companies).where(companies.c.version_id == version)
+            )
+            == 1
+        )
+        assert set(
+            connection.scalars(select(attempts.c.state).where(attempts.c.version_id == version))
+        ) == {"abandoned", "ready"}
+
+
+def test_retry_cleanup_failure_identifies_statement_without_private_sql(pipeline, tmp_path, caplog):
+    artifact, _version = seed_interrupted_retry(pipeline, tmp_path, rows=1)
+    private = "SYNTHETIC_PRIVATE_CLEANUP_SQL"
+
+    def fail_delete(_connection, _cursor, statement, *_args):
+        if statement.startswith("DELETE FROM etl_staging_rows"):
+            raise OperationalError(private, {"value": private}, RuntimeError(1205, private))
+
+    event.listen(pipeline.engine, "before_cursor_execute", fail_delete)
+    try:
+        with pytest.raises(ETLError, match="^database_error$"):
+            pipeline.ingest(artifact, source())
+    finally:
+        event.remove(pipeline.engine, "before_cursor_execute", fail_delete)
+    assert "operation=delete_retry_staging_batch outcome=sql_operation_failed" in caplog.text
+    assert "elapsed_ms=" in caplog.text
+    assert "driver_code=1205" in caplog.text
+    assert private not in caplog.text
+
+
+def test_retry_cleanup_survives_repeated_interruptions_and_excludes_same_input_worker(
+    pipeline, tmp_path, monkeypatch
+):
+    from app.etl import service
+
+    artifact, version = seed_interrupted_retry(pipeline, tmp_path, rows=3501)
+    remaining = select(func.count()).select_from(staging).where(staging.c.version_id == version)
+    attempt_states = select(attempts.c.state).where(attempts.c.version_id == version)
+
+    def reject_parse(_path):
+        pytest.fail("Retry must interrupt after a committed cleanup batch before parsing")
+
+    for expected in (2501, 1501):
+        deletes = 0
+
+        def interrupt(_connection, _cursor, statement, *_args, expected=expected):
+            nonlocal deletes
+            if statement.startswith("DELETE FROM etl_staging_rows"):
+                deletes += 1
+                if deletes == 2:
+                    with pipeline.engine.connect() as observer:
+                        assert observer.scalar(remaining) == expected
+                    with pytest.raises(ETLError, match="^version_busy$"):
+                        pipeline.ingest(artifact, source())
+                    raise ETLError("synthetic_cleanup_interrupted")
+
+        with monkeypatch.context() as patches:
+            patches.setattr(service, "records", reject_parse)
+            event.listen(pipeline.engine, "before_cursor_execute", interrupt)
+            try:
+                with pytest.raises(ETLError, match="^synthetic_cleanup_interrupted$"):
+                    pipeline.ingest(artifact, source())
+            finally:
+                event.remove(pipeline.engine, "before_cursor_execute", interrupt)
+        with pipeline.engine.connect() as observer:
+            assert observer.scalar(remaining) == expected
+
+    assert pipeline.ingest(artifact, source()) == version
+    with pipeline.engine.connect() as observer:
+        assert observer.scalar(remaining) == 0
+        assert Counter(observer.scalars(attempt_states)) == {"abandoned": 3, "ready": 1}
+
+
+def test_retry_cleanup_disconnect_rolls_back_only_uncommitted_batch(pipeline, tmp_path, caplog):
+    artifact, version = seed_interrupted_retry(pipeline, tmp_path)
+    remaining = select(func.count()).select_from(staging).where(staging.c.version_id == version)
+    deletes = []
+
+    def disconnect(connection, cursor, statement, *_args):
+        if statement.startswith("DELETE FROM etl_staging_rows"):
+            deleted = cursor.rowcount
+            session_id = connection.scalar(text("SELECT CONNECTION_ID()"))
+            deletes.append((session_id, deleted))
+            if len(deletes) == 2:
+                with pipeline.engine.connect() as killer:
+                    killer.execute(text(f"KILL CONNECTION {int(session_id)}"))
+
+    event.listen(pipeline.engine, "after_cursor_execute", disconnect)
+    try:
+        with pytest.raises(ETLError, match="^ingest_lock_lost$"):
+            pipeline.ingest(artifact, source())
+    finally:
+        event.remove(pipeline.engine, "after_cursor_execute", disconnect)
+
+    assert len(deletes) == 2
+    assert deletes[0] == deletes[1]
+    assert deletes[0][1] == 1000
+    assert "operation=commit_transaction outcome=connection_invalidated" in caplog.text
+    with pipeline.engine.connect() as observer:
+        assert observer.scalar(remaining) == 1501
+    assert pipeline.ingest(artifact, source()) == version
+    with pipeline.engine.connect() as observer:
+        assert observer.scalar(remaining) == 0
+
+
+@pytest.mark.parametrize("state", ["loading", "review", "approved", "published"])
+def test_retry_cleanup_protects_version_seals_and_pointer(pipeline, tmp_path, state):
+    artifact, version = seed_interrupted_retry(pipeline, tmp_path, rows=1)
+    version_row = select(versions).where(versions.c.id == version)
+    pointer = select(publications.c.current_version_id)
+    with pipeline.engine.begin() as connection:
+        connection.execute(update(versions).where(versions.c.id == version).values(state=state))
+        previous = connection.scalar(pointer)
+        connection.execute(update(publications).values(current_version_id=version))
+        before = connection.execute(version_row).one()
+    try:
+        if state == "loading":
+            with pytest.raises(ETLError, match="^retry_cleanup_not_allowed$"):
+                pipeline.ingest(artifact, source())
+        else:
+            assert pipeline.ingest(artifact, source()) == version
+        with pipeline.engine.connect() as observer:
+            assert observer.execute(version_row).one() == before
+            assert observer.scalar(pointer) == version
+            for table in (staging, companies):
+                assert (
+                    observer.scalar(
+                        select(func.count()).select_from(table).where(table.c.version_id == version)
+                    )
+                    == 1
+                )
+    finally:
+        with pipeline.engine.begin() as connection:
+            connection.execute(update(publications).values(current_version_id=previous))
 
 
 def test_ingest_connection_can_read_after_more_than_two_seconds(ingest_engine):

@@ -1,5 +1,78 @@
 # AI log
 
+## 2026-11-25 · M2.3A diagnosis and M2.3B retry cleanup
+
+The owner approved the isolated diagnosis, then approved M2.3B separately.
+The October retry lost its connection in `prepare_attempt` after 120,067 ms
+with driver code 2013. The retained Docker events show SIGTERM followed by
+SIGKILL 3.02 seconds later. After authorized InnoDB recovery, the isolated
+database still showed Alembic `0002_etl`, the expected October source hash, one
+`loading` version and one `loading` attempt, 4,229,451 staging rows, zero prepared
+rows, absent seals and a null publication pointer. The SQL report column was
+non-NULL and its JSON content was not inspected. There were no active
+transactions or lock waits when sampled. The diagnostic DB later exited 0
+after SIGTERM. The single large staging DELETE remains a hypothesis because
+the old log grouped multiple SQL statements under one operation name.
+
+Test first: the corrected three-test run gave 3 expected failures in 0.97 s.
+The original code deleted all 2,501 staged rows in one statement, reached
+parsing before a second retry batch, and logged a DELETE failure only as
+`prepare_attempt`. The expanded RED run gave 6 failed and 3 passed in 1.86 s
+across six test functions and four publication-state cases. The new failures
+covered repeated interruption, connection loss during cleanup and a loading
+version referenced by the publication pointer. Review, approved and published
+cases already passed. Earlier test setup issues were a missing parenthesis,
+a hook that caught the later staging delete, and shared synthetic version
+identities. The corrected RED runs used separate synthetic identities and
+the interruption hook observed committed rows from another connection.
+
+M2.3B creates the loading attempt before cleanup and holds the same advisory
+lock across transactions. Each transaction rechecks lock ownership and
+locks the publication pointer and target version in publication order.
+It reads at most 1,000 keys scoped to the target and commits one DELETE for
+those keys. Empty lookups for both tables precede parsing on a retry.
+Retry preparation stays outside legacy failure cleanup. The logs distinguish
+statement and transaction errors without recording SQL parameters. The
+focused GREEN run gave 9 passed in 1.95 s. The B023 lint fix bound the expected
+row count at callback creation. The first full verifier run passed Ruff and
+stopped at 72 passed and 2 failed in the non-integration suite. Two staging
+diagnostic cases returned `retry_cleanup_not_allowed` because the mock used a
+version ID different from the generated fresh-ingest ID. The test setup now
+returns deterministic version and attempt IDs so those cases reach their
+original staging failure. Assertions were preserved.
+
+On isolated MySQL 8.4.13, three interleaved synthetic versions held 180,003
+staging rows. Cleanup of the target removed 60,001 staging rows in 61 committed
+batches (median 27.64 ms, P95 32.46 ms, max 47.35 ms) and 8,001 prepared rows
+in 9 committed batches (median 20.20 ms, P95 and max 25.48 ms). Batch sizes
+ranged from 1 to 1,000. Wall time from the first cleanup transaction to
+parsing was 1,879.00 ms, including 26.69 ms of plan capture. P95 uses nearest
+rank. The SELECT plans used a covering staging version index and the covering
+prepared primary key. Plain EXPLAIN showed primary-key range access for both
+sampled DELETEs. Before and after fingerprints matched for both unrelated
+versions' staging, prepared data, metadata, seals and the publication pointer.
+
+The full verifier finished with exit 0 and Python assertions enabled. It ran
+`scripts/verify.py` through a temporary wrapper that sends SIGTERM and requires
+MySQL exit 0 before Compose teardown. It recorded 74 non-integration passes
+in 3.46 s, one baseline migration pass in 0.97 s, and 38 further MySQL
+integration passes in 24.99 s. The existing opt-in two-edition volume test
+was skipped by its own marker. Both Ruff lint checks passed. Ruff format checked
+35 backend files and one verifier script. Docker builds, ignore coverage,
+frontend lint, type checking and build, offline migration SQL, migration
+gates, ETL metadata and protected tmpfs, API outage and recovery, and
+persistence checks passed. Ledger lint and Git whitespace checks passed.
+MySQL exited 0 at each of the three stops in the final verifier run. Docker
+inspection after the run found no disposable containers, volumes, networks,
+or image tags for the verified projects. Both preserved volumes retained
+their expected Docker ownership labels.
+
+The measurement supports 1,000 rows per transaction on this fixture. The
+full October scale, final staging and failure cleanup after parsing, other
+large ETL operations, and the default two-second read timeout during approval
+and publication remain separate work. Q-005 remains investigating and real
+SQL diff performance remains unverified. [ETL recovery guide](docs/M2-ETL.md).
+
 ## 2026-11-25 · PR #6 Section G specialist review fix
 
 The independent Performance Specialist and SEO/GEO Expert found no actionable

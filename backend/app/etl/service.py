@@ -22,6 +22,7 @@ from app.etl.source import HEADER, LEGAL_FORMS, PROFILE_VERSION, RETAINED, SOURC
 DATASET = "onrc-firme-pj"
 FIELDS = tuple(RETAINED.values())
 QUALITY_FORMAT = 1
+RETRY_BATCH_SIZE = 1000
 logger = logging.getLogger(__name__)
 INGEST_DATABASE_ERRORS = (SQLAlchemyError, MySQLError)
 
@@ -180,6 +181,51 @@ def ingest_transaction(connection, lock_name):
         if connection.invalidated:
             raise ETLError("ingest_lock_lost") from None
         raise
+    else:
+        if logger.isEnabledFor(logging.DEBUG):
+            log_ingest_operation(logging.DEBUG, phase, "completed", started_at)
+
+
+def lock_publication_pointer(connection):
+    # Match publish's lock order: pointer before version. Readers can share this lock.
+    with ingest_operation(connection, "check_retry_publication"):
+        current_version = connection.scalar(
+            select(func.coalesce(publications.c.current_version_id, ""))
+            .where(publications.c.dataset == DATASET)
+            .with_for_update(read=True)
+        )
+    if current_version is None:
+        raise ETLError("retry_cleanup_not_allowed")
+    return current_version
+
+
+def clear_retry_rows(connection, lock_name, version_id):
+    for table, key, label in (
+        (staging, staging.c.id, "staging"),
+        (companies, companies.c.euid, "prepared"),
+    ):
+        scope = table.c.version_id == version_id
+        batch = select(key).where(scope).limit(RETRY_BATCH_SIZE)
+        if table is staging:
+            # Read only this version's index range, even when row IDs are interleaved.
+            batch = batch.with_hint(staging, "FORCE INDEX (ix_etl_staging_version_key)", "mysql")
+        while True:
+            with ingest_transaction(connection, lock_name):
+                current_version = lock_publication_pointer(connection)
+                with ingest_operation(connection, "check_retry_version"):
+                    state = connection.scalar(
+                        select(versions.c.state)
+                        .where(versions.c.id == version_id)
+                        .with_for_update()
+                    )
+                if state != "loading" or current_version == version_id:
+                    raise ETLError("retry_cleanup_not_allowed")
+                with ingest_operation(connection, f"select_retry_{label}_batch"):
+                    keys = connection.scalars(batch).all()
+                if not keys:
+                    break
+                with ingest_operation(connection, f"delete_retry_{label}_batch"):
+                    connection.execute(delete(table).where(scope, key.in_(keys)))
 
 
 class Pipeline:
@@ -244,10 +290,8 @@ class Pipeline:
             versions.c.sha256 == sha256,
             versions.c.profile == PROFILE_VERSION,
         )
-        with (
-            ingest_transaction(connection, lock_name),
-            ingest_operation(connection, "prepare_attempt"),
-        ):
+        with ingest_transaction(connection, lock_name):
+            current_version = lock_publication_pointer(connection)
             statement = mysql_insert(versions).values(
                 id=candidate,
                 edition=source.edition,
@@ -270,49 +314,60 @@ class Pipeline:
                     "transfer": transfer or {},
                 },
             )
-            connection.execute(statement.on_duplicate_key_update(id=versions.c.id))
-            version = (
-                connection.execute(select(versions).where(*identity).with_for_update())
-                .mappings()
-                .one()
-            )
+            # Retain the existing operation name for the version upsert.
+            with ingest_operation(connection, "prepare_attempt"):
+                connection.execute(statement.on_duplicate_key_update(id=versions.c.id))
+            with ingest_operation(connection, "select_retry_version"):
+                version = (
+                    connection.execute(select(versions).where(*identity).with_for_update())
+                    .mappings()
+                    .one()
+                )
             version_id = version["id"]
             reused = candidate != version_id and version["state"] in {
                 "review",
                 "approved",
                 "published",
             }
-            abandoned = candidate != version_id and version["state"] == "loading"
-            if abandoned:
+            if not reused and (
+                version["state"] not in {"loading", "failed"} or current_version == version_id
+            ):
+                raise ETLError("retry_cleanup_not_allowed")
+            if candidate != version_id and not reused:
+                with ingest_operation(connection, "abandon_retry_attempts"):
+                    connection.execute(
+                        update(attempts)
+                        .where(attempts.c.version_id == version_id, attempts.c.state == "loading")
+                        .values(state="abandoned", failure_code="worker_interrupted")
+                    )
+            with ingest_operation(connection, "insert_ingest_attempt"):
                 connection.execute(
-                    update(attempts)
-                    .where(attempts.c.version_id == version_id, attempts.c.state == "loading")
-                    .values(state="abandoned", failure_code="worker_interrupted")
-                )
-            connection.execute(
-                insert(attempts).values(
-                    id=attempt_id,
-                    version_id=version_id,
-                    state="reused" if reused else "loading",
-                    created_at=datetime.now(UTC).replace(tzinfo=None),
-                )
-            )
-            if not reused:
-                connection.execute(delete(staging).where(staging.c.version_id == version_id))
-                connection.execute(delete(companies).where(companies.c.version_id == version_id))
-                connection.execute(
-                    update(versions)
-                    .where(versions.c.id == version_id)
-                    .values(
-                        state="loading",
-                        report=None,
-                        report_hash=None,
-                        prepared_hash=None,
-                        approval=None,
+                    insert(attempts).values(
+                        id=attempt_id,
+                        version_id=version_id,
+                        state="reused" if reused else "loading",
+                        created_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                 )
+            if candidate != version_id and not reused:
+                with ingest_operation(connection, "reset_retry_version"):
+                    connection.execute(
+                        update(versions)
+                        .where(versions.c.id == version_id)
+                        .values(
+                            state="loading",
+                            report=None,
+                            report_hash=None,
+                            prepared_hash=None,
+                            approval=None,
+                        )
+                    )
         if reused:
             return version_id
+        if candidate != version_id:
+            # Keep recovery outside the parser's failure handler. A successor can
+            # resume committed cleanup; never fall back to an unbounded delete.
+            clear_retry_rows(connection, lock_name, version_id)
 
         counters, reasons, nulls = Counter(), Counter(), Counter()
         source_forms = dict.fromkeys((*sorted(LEGAL_FORMS), "missing", "other"), 0)
