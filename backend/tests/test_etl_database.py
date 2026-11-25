@@ -14,7 +14,7 @@ from sqlalchemy.exc import OperationalError
 from app.db import create_database_engine
 from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
-from app.etl.service import PROFILE_VERSION, Pipeline, digest_json, file_hash
+from app.etl.service import PROFILE_VERSION, Pipeline, clear_retry_rows, digest_json, file_hash
 from app.etl.source import HEADER, RETAINED
 from tests.conftest import isolated_test_settings
 from tests.etl_fixtures import csv_file, row, source
@@ -985,6 +985,115 @@ def test_retry_cleanup_protects_version_seals_and_pointer(pipeline, tmp_path, st
                     )
                     == 1
                 )
+    finally:
+        with pipeline.engine.begin() as connection:
+            connection.execute(update(publications).values(current_version_id=previous))
+
+
+def retry_protection_snapshot(connection, version):
+    def rows(table, column):
+        return connection.execute(
+            select(table).where(column == version).order_by(*table.primary_key.columns)
+        ).all()
+
+    return (
+        rows(versions, versions.c.id),
+        rows(staging, staging.c.version_id),
+        rows(companies, companies.c.version_id),
+        connection.execute(select(publications)).all(),
+    )
+
+
+@pytest.mark.parametrize("phase", ["preparation", "batch"])
+def test_retry_cleanup_rejects_case_equivalent_publication_pointer(
+    pipeline, tmp_path, monkeypatch, phase
+):
+    from app.etl import service
+
+    fixed_version = f"00000000-0000-4000-abcd-{1 if phase == 'preparation' else 2:012d}"
+    generated_ids = iter((fixed_version, f"synthetic-attempt-{phase}"))
+    with monkeypatch.context() as patches:
+        patches.setattr(service, "uuid4", lambda: next(generated_ids))
+        artifact, version = seed_interrupted_retry(pipeline, tmp_path, rows=1)
+    pointer = select(publications.c.current_version_id)
+    alternate = version.upper()
+    assert version == fixed_version and alternate != version
+    with pipeline.engine.begin() as connection:
+        collations = dict(
+            connection.execute(
+                text(
+                    "SELECT TABLE_NAME, COLLATION_NAME FROM information_schema.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND "
+                    "((TABLE_NAME = 'etl_versions' AND COLUMN_NAME = 'id') OR "
+                    "(TABLE_NAME = 'dataset_publications' AND COLUMN_NAME = 'current_version_id'))"
+                )
+            ).all()
+        )
+        assert len(collations) == 2 and len(set(collations.values())) == 1
+        assert all(collation.endswith("_ci") for collation in collations.values())
+        print(f"Pointer UUID column collations: {collations}")
+        assert connection.scalar(select(versions.c.id).where(versions.c.id == alternate)) == version
+        previous = connection.scalar(pointer)
+        connection.execute(update(publications).values(current_version_id=alternate))
+        assert connection.scalar(pointer) == alternate
+        before = retry_protection_snapshot(connection, version)
+        assert all(len(rows) == 1 for rows in before)
+    try:
+        with pytest.raises(ETLError, match="^retry_cleanup_not_allowed$"):
+            if phase == "preparation":
+                pipeline.ingest(artifact, source())
+            else:
+                edition = source()
+                lock_name = digest_json(
+                    [
+                        pipeline.engine.url.database,
+                        edition.kind,
+                        edition.resource_id,
+                        PROFILE_VERSION,
+                        file_hash(artifact),
+                    ]
+                )
+                with pipeline.engine.connect() as connection:
+                    assert connection.scalar(text("SELECT GET_LOCK(:name, 0)"), {"name": lock_name})
+                    connection.commit()
+                    try:
+                        clear_retry_rows(connection, lock_name, version)
+                    finally:
+                        assert connection.scalar(
+                            text("SELECT RELEASE_LOCK(:name)"), {"name": lock_name}
+                        )
+        with pipeline.engine.connect() as connection:
+            assert retry_protection_snapshot(connection, version) == before
+    finally:
+        with pipeline.engine.begin() as connection:
+            connection.execute(update(publications).values(current_version_id=previous))
+
+
+@pytest.mark.parametrize("state", ["approved", "published"])
+def test_retry_preserves_sealed_noncurrent_version(pipeline, tmp_path, state):
+    artifact = csv_file(tmp_path / "sealed-retry.csv", [row(9810, DENUMIRE=state)])
+    version = pipeline.ingest(artifact, source())
+    current_path = csv_file(tmp_path / "current-for-sealed-retry.csv", [row(9811, DENUMIRE=state)])
+    current_source = source("2026-11-04")
+    current = pipeline.ingest(current_path, current_source)
+    pointer = select(publications.c.current_version_id)
+    with pipeline.engine.connect() as connection:
+        previous = connection.scalar(pointer)
+    try:
+        approval = pipeline.approve(version, pipeline.report(version)["report_hash"])
+        if state == "published":
+            pipeline.publish(version, approval)
+        publish(pipeline, current)
+        with pipeline.engine.connect() as connection:
+            assert connection.scalar(pointer) == current != version
+            before = retry_protection_snapshot(connection, version)
+            assert before[0][0].state == state
+            assert before[0][0].approval == approval and approval
+            assert before[0][0].report_hash and before[0][0].prepared_hash
+            assert len(before[2]) == 1
+        assert pipeline.ingest(artifact, source()) == version
+        with pipeline.engine.connect() as connection:
+            assert retry_protection_snapshot(connection, version) == before
     finally:
         with pipeline.engine.begin() as connection:
             connection.execute(update(publications).values(current_version_id=previous))

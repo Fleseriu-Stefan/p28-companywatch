@@ -21,6 +21,8 @@
 - Q-010 · How should the real SQL diff benchmark be measured? · _answered_
 - Q-011 · What API request limits and quotas should apply?
 - Q-012 · Can the accountant supply a verified, anonymized example if needed?
+- Q-013 · Does delayed InnoDB purge make retry batches revisit deleted index entries? · _investigating_
+- Q-014 · Can idempotent ingest reuse avoid holding the publication pointer lock? · _investigating_
 
 ---
 
@@ -51,7 +53,7 @@
 - **Who answers:** Project owner, after source investigation.
 - **Partial answer:** User approved the two verified OD_FIRME.CSV editions (19.10.2026 and 04.11.2026) for M2 development, the candidate EUID key, minimal legal-entity fields and temporary protected raw processing. D-006–D-008 and C-002 govern implementation. The owner later explicitly authorized full downloads and isolated ingestion for both approved editions. The October edition was fully downloaded and 4,229,451 source rows were staged, but ingestion failed during duplicate aggregation; no complete quality report or accepted snapshot was produced. The November edition was not downloaded, and no version was published. A new real-ingestion attempt requires separate explicit authorization. The existing development data remains protected. Complete eligible counts and global quality for both editions must be measured before manual publication. See ../ONRC-SOURCE.md.
 - **Still open:** Measure total source rows, eligible legal entities per edition, and real SQL diff input size separately. If the approved editions cannot meet the requirements or the existing publication gate, investigate another official ONRC edition first and present it for separate approval. Keep the approved classification. Full validation still requires explicit authorization.
-- **Confirmed:** 2026-11-25
+- **Follow-up evidence:** The second authorized October attempt lost its connection during `prepare_attempt`. The [M2.3A diagnosis](../M2-ETL.md#m23a--starea-după-a-doua-încercare) records the recovered database state. No complete report or publication resulted.
 
 ## Q-006 · What interview evidence and checkpoint rubric must be delivered?
 - **Status:** investigating
@@ -96,3 +98,15 @@
 - **Blocks:** A concrete case study only if later required.
 - **Who answers:** Project owner with the accountant.
 - **Partial answer:** The interview documented a recurring workflow and no verified company or transaction. Keep any later example anonymized and free of confidential client material.
+
+## Q-013 · Does delayed InnoDB purge make retry batches revisit deleted index entries?
+- **Status:** investigating
+- **Blocks:** A new full real-data retry pending M2.3C evaluation.
+- **Evidence:** The PR #7 performance review found that each limited batch starts at the beginning of the same version's index range. An older read view can delay purge, so later batches may revisit delete-marked entries while holding the shared publication pointer lock. The synthetic M2.3B timing did not exercise purge lag.
+- **Proposed investigation:** During M2.3C, hold a synthetic read view open and compare early and late batch plans, scan work, and time. Evaluate a seek cursor in existing index order, including nullable staging digests and the staging ID tie-breaker. Advance the cursor only after a successful commit. Any implementation requires approval.
+
+## Q-014 · Can idempotent ingest reuse avoid holding the publication pointer lock?
+- **Status:** investigating
+- **Blocks:** A new full real-data retry pending M2.3C evaluation.
+- **Evidence:** The PR #7 performance review found that ingest takes the shared pointer lock before establishing reuse. If approval holds version A's row lock while verifying its seal, reuse of A can wait with the pointer held and delay publication of version B.
+- **Proposed investigation:** During M2.3C, measure a simultaneous approval of A, reuse of A, and publication of B with synthetic resources. Evaluate a reuse path without the pointer lock and a separate eligibility recheck for cleanup that preserves pointer-before-version ordering. Any implementation requires approval.

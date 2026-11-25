@@ -63,12 +63,15 @@ pentru un câmp foarte mare produce eroare de fișier, nu pierdere de conținut.
    validare și carantinarea duplicatelor. Totalurile corespund cu
    `source_records`, respectiv `accepted_records`.
 9. La succes, snapshotul minim este pregătit, staging-ul este șters și versiunea
-   intră în `review`. Dacă workerul păstrează conexiunea validă și lock-ul de
-   sesiune, la eșec șterge staging-ul și rândurile pregătite ale versiunii
+   intră în `review`. Dacă ingestia eșuează după începerea parsării și workerul
+   păstrează conexiunea validă și lock-ul de sesiune, acesta șterge staging-ul
+   și rândurile pregătite ale versiunii
    nepublicate, marchează versiunea și încercarea `failed` și păstrează un raport
    agregat de eroare. Dacă conexiunea este invalidată sau lock-ul este pierdut,
    workerul se oprește fără curățare nesigură; staging-ul deja comis și starea
-   `loading` pot rămâne până la recuperarea sub lock descrisă mai jos.
+   `loading` pot rămâne până la recuperarea sub lock descrisă mai jos. Erorile
+   din curățarea de reluare, înaintea parsării, pot lăsa versiunea în `loading`
+   chiar dacă sesiunea rămâne validă. Vezi [recuperarea M2.3B](#m23b--curățare-la-reluarea-ingestiei).
 
 Cele cinci tabele M2 sunt `etl_versions` (inclusiv manifest și raport),
 `etl_attempts`, `etl_staging_rows`, `company_version_rows`, `dataset_publications`.

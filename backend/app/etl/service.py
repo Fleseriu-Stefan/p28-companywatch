@@ -10,7 +10,7 @@ from time import monotonic
 from uuid import uuid4
 
 from pymysql.err import MySQLError
-from sqlalchemy import delete, func, insert, select, text, update
+from sqlalchemy import case, delete, func, insert, select, text, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 
@@ -188,9 +188,16 @@ def ingest_transaction(connection, lock_name):
 
 def lock_publication_pointer(connection):
     # Match publish's lock order: pointer before version. Readers can share this lock.
+    # Resolve the stored pointer using the foreign key's database collation.
+    canonical_id = (
+        select(versions.c.id)
+        .where(versions.c.id == publications.c.current_version_id)
+        .correlate(publications)
+        .scalar_subquery()
+    )
     with ingest_operation(connection, "check_retry_publication"):
         current_version = connection.scalar(
-            select(func.coalesce(publications.c.current_version_id, ""))
+            select(case((publications.c.current_version_id.is_(None), ""), else_=canonical_id))
             .where(publications.c.dataset == DATASET)
             .with_for_update(read=True)
         )

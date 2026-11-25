@@ -1,5 +1,55 @@
 # AI log
 
+## 2026-11-25 · PR #7 Section G specialist review and remediation
+
+Three independent specialists reviewed PR #7 at `dd5faac0`. The Security
+Engineer found that Python equality could miss a case-equivalent MySQL
+publication pointer and that the protection fixture did not exercise a
+non-null approval seal on a historical published version. The SEO and GEO
+review found no changed visitor-facing functionality. It identified an
+overbroad failure description in the ETL guide and the missing second-attempt
+reference in Q-005. The owner approved those corrections and deferred the
+Performance Specialist's findings to the M2.3C evaluation.
+
+Test first: both UUID columns used `utf8mb4_0900_ai_ci` on fresh synthetic
+MySQL. The old code accepted an uppercase pointer to a lowercase version
+in retry preparation and within a batch. Both guard tests failed with
+`DID NOT RAISE ETLError`. The focused RED run recorded 2 failed and 11
+passed in 2.54 s. The two sealed non-current cases passed on the original
+code and now guard real synthetic approval seals and historical prepared rows.
+The focused GREEN run recorded 13 passed in 2.58 s on a different disposable
+MySQL project.
+
+The shared pointer query now resolves the stored reference to the canonical
+version primary key using MySQL comparison. Both guard sites use this
+result while retaining the existing lock order, transaction boundaries and
+independent version-state checks. The new assertions compare rows, metadata,
+seals and the pointer before and after the attempted retry. The ETL guide
+now distinguishes errors in retry cleanup from failures after parsing begins.
+Q-005 links to the M2.3A diagnosis and remains investigating. Its previous
+confirmation date was removed under the edited-entry convention.
+
+The complete verifier exited 0 with assertions enabled: 74 non-integration
+tests passed in 3.63 s, the baseline migration test passed in 0.97 s, and 42
+remaining MySQL integration tests passed in 25.78 s. The existing opt-in
+two-edition volume test was skipped by its marker. Ruff lint and format,
+Docker builds, frontend checks, migration gates, protected tmpfs, API outage
+and recovery, and persistence passed. Ledger lint and `git diff --check`
+passed. The focused runs reused the guarded runner with the added tests and
+the PR head check. The full run reused the temporary graceful-shutdown
+wrapper. The runners verified disposable ownership and required MySQL exit 0
+before teardown. Docker inspection found no remaining resources for the
+three test projects. Both preserved volumes retained their ownership labels.
+
+The deferred index scan and pointer lock findings are recorded as Q-013 and
+Q-014 for M2.3C evaluation before another full real-data retry. Long-running
+read views may delay purge and make later batches revisit delete-marked
+index entries. Idempotent reuse may also hold the shared publication pointer
+lock while waiting on a version row held by approval, delaying publication of
+an unrelated version. Neither optimization is implemented here.
+PATTERN-003 remains candidate-only and real SQL diff performance remains
+unverified.
+
 ## 2026-11-25 · M2.3A diagnosis and M2.3B retry cleanup
 
 The owner approved the isolated diagnosis, then approved M2.3B separately.
