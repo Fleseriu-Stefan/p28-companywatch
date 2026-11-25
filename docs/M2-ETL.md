@@ -1,8 +1,10 @@
 # CompanyWatch M2 — pipeline și primul import real
 
 M2 este implementat și verificat inițial cu fixtures sintetice și MySQL izolat.
-Nu au fost descărcate integral edițiile ONRC și baza locală de dezvoltare M1 nu a
-fost migrată. Acest ghid nu autorizează importul real sau publicarea lui.
+Ediția ONRC din 19.10.2026 a fost descărcată integral într-un tmpfs protejat pentru
+o încercare autorizată, dar ingestia s-a oprit înainte de validarea completă;
+ediția din 04.11.2026 nu a fost descărcată integral. Baza locală de dezvoltare M1
+nu a fost migrată. Acest ghid nu autorizează o nouă descărcare sau publicarea.
 
 ## Surse și selecție
 
@@ -61,8 +63,12 @@ pentru un câmp foarte mare produce eroare de fișier, nu pierdere de conținut.
    validare și carantinarea duplicatelor. Totalurile corespund cu
    `source_records`, respectiv `accepted_records`.
 9. La succes, snapshotul minim este pregătit, staging-ul este șters și versiunea
-   intră în `review`. La eșec se elimină numai datele incomplete ale versiunii
-   nepublicate și se păstrează raportul agregat de eroare.
+   intră în `review`. Dacă workerul păstrează conexiunea validă și lock-ul de
+   sesiune, la eșec șterge staging-ul și rândurile pregătite ale versiunii
+   nepublicate, marchează versiunea și încercarea `failed` și păstrează un raport
+   agregat de eroare. Dacă conexiunea este invalidată sau lock-ul este pierdut,
+   workerul se oprește fără curățare nesigură; staging-ul deja comis și starea
+   `loading` pot rămâne până la recuperarea sub lock descrisă mai jos.
 
 Cele cinci tabele M2 sunt `etl_versions` (inclusiv manifest și raport),
 `etl_attempts`, `etl_staging_rows`, `company_version_rows`, `dataset_publications`.
@@ -93,6 +99,39 @@ Identitatea este resource ID + tip real/sintetic + SHA-256 complet + versiunea
 transformării. Schimbarea regulilor de transformare cere un nou `PROFILE_VERSION`.
 Reingestia identică în `review`/`approved`/`published` reutilizează versiunea și
 înregistrează încercarea; nu dublează companiile.
+
+### M2.2 — timeout de citire și încercare întreruptă
+
+În încercarea izolată pentru ediția din 19.10.2026, toate cele 4.229.451 de rânduri
+sursă au ajuns în staging. Operația `count_duplicate_groups` a pierdut conexiunea
+după 2005,2 ms (cod MySQL 2013), iar CLI a raportat `ingest_lock_lost`. MySQL a
+rămas sănătos, fără restart sau OOM. Versiunea și încercarea au rămas în `loading`,
+fără rânduri pregătite și fără schimbarea pointerului de publicare. Nu există încă
+raport complet de calitate sau număr verificat de persoane juridice acceptate.
+
+Diagnosticarea separată, doar în baza izolată, a verificat schema `0002_etl` și
+indexul `(version_id, key_digest)`. `EXPLAIN FORMAT=JSON` a arătat o scanare de
+interval acoperită de index, urmată de materializarea grupurilor într-un tabel
+temporar, fără filesort. Interogarea exactă a numărului de grupuri duplicate a
+returnat 4.713 grupuri în 23,16 s timp de perete, incluzând pornirea clientului,
+cu limită MySQL de 120 s numai pentru sesiunea de diagnostic și termen client de
+135 s. Această durată depășește timeoutul de citire PyMySQL de 2 s folosit inițial
+de ETL și explică pierderea conexiunii. Nu este un benchmark al diff-ului SQL și
+nu dovedește validarea completă a fișierului.
+
+M2.2 păstrează timeoutul implicit de citire de 2 s pentru API și comenzile CLI
+altele decât `ingest`. Numai `etl ingest` folosește 120 s; timeouturile de
+conectare/scriere, cel al pool-ului și verificarea lock-ului rămân neschimbate.
+Limita de 120 s este finită. Dacă o operație atinge această limită într-o nouă
+încercare autorizată, oprește importul și reexaminează planul, fără creșteri
+automate ale timeoutului.
+
+Rândurile păstrate în staging nu se reiau din mijloc. Cheia HMAC a încercării și
+contoarele parserului erau numai în memoria workerului. La o reingestie autorizată
+a aceluiași conținut, noul deținător al lock-ului marchează încercarea veche
+`abandoned`, șterge staging-ul incomplet și reface parsarea, validarea și raportul
+integral sub aceeași identitate de versiune. Nu rula această recuperare pe volumul
+de dezvoltare și nu aproba sau publica versiunea rămasă în `loading`.
 
 ## Aprobare, publicare și diff
 
@@ -315,7 +354,7 @@ corespunde. O diferență de schemă oprește migrarea și indică obiectul pent
 investigare. Păstrează volumul pentru diagnostic. SQL-ul Alembic offline este
 pentru o instalare nouă și nu poate valida starea unei migrări parțiale.
 
-## Primul import real — pași viitori, neexecutați
+## O nouă încercare de import real — pași care cer autorizare separată
 
 1. Obține aprobarea explicită pentru descărcările integrale și pentru baza țintă.
 2. Reverifică metadatele oficiale, URL-urile, licența și dimensiunile; verifică
