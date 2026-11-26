@@ -63,12 +63,15 @@ pentru un câmp foarte mare produce eroare de fișier, nu pierdere de conținut.
    validare și carantinarea duplicatelor. Totalurile corespund cu
    `source_records`, respectiv `accepted_records`.
 9. La succes, snapshotul minim este pregătit, staging-ul este șters și versiunea
-   intră în `review`. Dacă workerul păstrează conexiunea validă și lock-ul de
-   sesiune, la eșec șterge staging-ul și rândurile pregătite ale versiunii
+   intră în `review`. Dacă ingestia eșuează după începerea parsării și workerul
+   păstrează conexiunea validă și lock-ul de sesiune, acesta șterge staging-ul
+   și rândurile pregătite ale versiunii
    nepublicate, marchează versiunea și încercarea `failed` și păstrează un raport
    agregat de eroare. Dacă conexiunea este invalidată sau lock-ul este pierdut,
    workerul se oprește fără curățare nesigură; staging-ul deja comis și starea
-   `loading` pot rămâne până la recuperarea sub lock descrisă mai jos.
+   `loading` pot rămâne până la recuperarea sub lock descrisă mai jos. Erorile
+   din curățarea de reluare, înaintea parsării, pot lăsa versiunea în `loading`
+   chiar dacă sesiunea rămâne validă. Vezi [recuperarea M2.3B](#m23b--curățare-la-reluarea-ingestiei).
 
 Cele cinci tabele M2 sunt `etl_versions` (inclusiv manifest și raport),
 `etl_attempts`, `etl_staging_rows`, `company_version_rows`, `dataset_publications`.
@@ -132,6 +135,49 @@ a aceluiași conținut, noul deținător al lock-ului marchează încercarea vec
 `abandoned`, șterge staging-ul incomplet și reface parsarea, validarea și raportul
 integral sub aceeași identitate de versiune. Nu rula această recuperare pe volumul
 de dezvoltare și nu aproba sau publica versiunea rămasă în `loading`.
+
+### M2.3A — starea după a doua încercare
+
+A doua încercare a ajuns la `prepare_attempt` și a pierdut conexiunea după
+120.067 ms (cod 2013). Docker a trimis SIGKILL la aproximativ 3,02 s după
+SIGTERM. Diagnosticul autorizat ulterior a pornit doar MySQL din proiectul
+izolat și a verificat starea după recuperarea InnoDB. Versiunea de octombrie
+și singura sa încercare erau încă `loading`, cu 4.229.451 de rânduri în staging,
+zero rânduri pregătite, fără sigilii și cu pointerul de publicare nul.
+Valoarea JSON a raportului nu a fost inspectată. Nicio schimbare comisă de a
+doua pregătire nu era vizibilă. Ștergerea staging-ului într-o singură
+tranzacție rămâne ipoteza principală. Logul acelei încercări nu identifică
+instrucțiunea SQL exactă.
+
+### M2.3B — curățare la reluarea ingestiei
+
+O tranzacție scurtă actualizează încercările abandonate și înregistrează
+noua încercare în starea `loading`. Urmează tranzacții separate pentru loturi
+de cel mult 1.000 de rânduri din staging sau din snapshotul nepregătit pentru
+review. Aceeași sesiune MySQL păstrează lock-ul de ingestie. Fiecare
+tranzacție verifică lock-ul, starea versiunii și pointerul de publicare
+înainte de ștergere. Versiunile `review`, `approved`, `published` și
+sigiliile lor sunt păstrate. Parsarea reîncepe după ce ambele selecții
+limitate nu mai returnează rânduri pentru versiunea în lucru.
+
+La întrerupere, loturile comise rămân șterse. Următorul worker care obține
+lock-ul continuă cu rândurile rămase. Pierderea lock-ului sau a conexiunii
+oprește workerul. Erorile înainte de parsare nu intră în curățarea folosită
+după un eșec al ingestiei. Logurile disting selecția, ștergerea și erorile
+de commit sau rollback și păstrează doar eticheta, rezultatul, durata și
+codul numeric al driverului, când există. Limita de citire rămâne 120 s
+pentru ingestie.
+
+În MySQL 8.4.13, un test sintetic cu trei versiuni intercalate a șters
+60.001 de rânduri de staging și 8.001 rânduri pregătite în 70 de loturi
+comise. Curățarea a durat 1.879 ms, dintre care aproximativ 27 ms pentru
+capturarea planurilor. Selecțiile au folosit indexul
+`ix_etl_staging_version_key` și cheia primară a snapshoturilor. Celelalte
+versiuni și pointerul au trecut comparația de conținut înainte și după.
+Rezultatul susține limita de 1.000 de rânduri pe configurația măsurată.
+Curățarea finală și la eșec după parsare, testul la 4,23 milioane de
+rânduri, verificarea sigiliilor cu limita implicită de 2 s și performanța
+diff-ului pe date reale rămân de verificat separat.
 
 ## Aprobare, publicare și diff
 

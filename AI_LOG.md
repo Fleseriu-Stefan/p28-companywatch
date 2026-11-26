@@ -1,5 +1,128 @@
 # AI log
 
+## 2026-11-25 · PR #7 Section G specialist review and remediation
+
+Three independent specialists reviewed PR #7 at `dd5faac0`. The Security
+Engineer found that Python equality could miss a case-equivalent MySQL
+publication pointer and that the protection fixture did not exercise a
+non-null approval seal on a historical published version. The SEO and GEO
+review found no changed visitor-facing functionality. It identified an
+overbroad failure description in the ETL guide and the missing second-attempt
+reference in Q-005. The owner approved those corrections and deferred the
+Performance Specialist's findings to the M2.3C evaluation.
+
+Test first: both UUID columns used `utf8mb4_0900_ai_ci` on fresh synthetic
+MySQL. The old code accepted an uppercase pointer to a lowercase version
+in retry preparation and within a batch. Both guard tests failed with
+`DID NOT RAISE ETLError`. The focused RED run recorded 2 failed and 11
+passed in 2.54 s. The two sealed non-current cases passed on the original
+code and now guard real synthetic approval seals and historical prepared rows.
+The focused GREEN run recorded 13 passed in 2.58 s on a different disposable
+MySQL project.
+
+The shared pointer query now resolves the stored reference to the canonical
+version primary key using MySQL comparison. Both guard sites use this
+result while retaining the existing lock order, transaction boundaries and
+independent version-state checks. The new assertions compare rows, metadata,
+seals and the pointer before and after the attempted retry. The ETL guide
+now distinguishes errors in retry cleanup from failures after parsing begins.
+Q-005 links to the M2.3A diagnosis and remains investigating. Its previous
+confirmation date was removed under the edited-entry convention.
+
+The complete verifier exited 0 with assertions enabled: 74 non-integration
+tests passed in 3.63 s, the baseline migration test passed in 0.97 s, and 42
+remaining MySQL integration tests passed in 25.78 s. The existing opt-in
+two-edition volume test was skipped by its marker. Ruff lint and format,
+Docker builds, frontend checks, migration gates, protected tmpfs, API outage
+and recovery, and persistence passed. Ledger lint and `git diff --check`
+passed. The focused runs reused the guarded runner with the added tests and
+the PR head check. The full run reused the temporary graceful-shutdown
+wrapper. The runners verified disposable ownership and required MySQL exit 0
+before teardown. Docker inspection found no remaining resources for the
+three test projects. Both preserved volumes retained their ownership labels.
+
+The deferred index scan and pointer lock findings are recorded as Q-013 and
+Q-014 for M2.3C evaluation before another full real-data retry. Long-running
+read views may delay purge and make later batches revisit delete-marked
+index entries. Idempotent reuse may also hold the shared publication pointer
+lock while waiting on a version row held by approval, delaying publication of
+an unrelated version. Neither optimization is implemented here.
+PATTERN-003 remains candidate-only and real SQL diff performance remains
+unverified.
+
+## 2026-11-25 · M2.3A diagnosis and M2.3B retry cleanup
+
+The owner approved the isolated diagnosis, then approved M2.3B separately.
+The October retry lost its connection in `prepare_attempt` after 120,067 ms
+with driver code 2013. The retained Docker events show SIGTERM followed by
+SIGKILL 3.02 seconds later. After authorized InnoDB recovery, the isolated
+database still showed Alembic `0002_etl`, the expected October source hash, one
+`loading` version and one `loading` attempt, 4,229,451 staging rows, zero prepared
+rows, absent seals and a null publication pointer. The SQL report column was
+non-NULL and its JSON content was not inspected. There were no active
+transactions or lock waits when sampled. The diagnostic DB later exited 0
+after SIGTERM. The single large staging DELETE remains a hypothesis because
+the old log grouped multiple SQL statements under one operation name.
+
+Test first: the corrected three-test run gave 3 expected failures in 0.97 s.
+The original code deleted all 2,501 staged rows in one statement, reached
+parsing before a second retry batch, and logged a DELETE failure only as
+`prepare_attempt`. The expanded RED run gave 6 failed and 3 passed in 1.86 s
+across six test functions and four publication-state cases. The new failures
+covered repeated interruption, connection loss during cleanup and a loading
+version referenced by the publication pointer. Review, approved and published
+cases already passed. Earlier test setup issues were a missing parenthesis,
+a hook that caught the later staging delete, and shared synthetic version
+identities. The corrected RED runs used separate synthetic identities and
+the interruption hook observed committed rows from another connection.
+
+M2.3B creates the loading attempt before cleanup and holds the same advisory
+lock across transactions. Each transaction rechecks lock ownership and
+locks the publication pointer and target version in publication order.
+It reads at most 1,000 keys scoped to the target and commits one DELETE for
+those keys. Empty lookups for both tables precede parsing on a retry.
+Retry preparation stays outside legacy failure cleanup. The logs distinguish
+statement and transaction errors without recording SQL parameters. The
+focused GREEN run gave 9 passed in 1.95 s. The B023 lint fix bound the expected
+row count at callback creation. The first full verifier run passed Ruff and
+stopped at 72 passed and 2 failed in the non-integration suite. Two staging
+diagnostic cases returned `retry_cleanup_not_allowed` because the mock used a
+version ID different from the generated fresh-ingest ID. The test setup now
+returns deterministic version and attempt IDs so those cases reach their
+original staging failure. Assertions were preserved.
+
+On isolated MySQL 8.4.13, three interleaved synthetic versions held 180,003
+staging rows. Cleanup of the target removed 60,001 staging rows in 61 committed
+batches (median 27.64 ms, P95 32.46 ms, max 47.35 ms) and 8,001 prepared rows
+in 9 committed batches (median 20.20 ms, P95 and max 25.48 ms). Batch sizes
+ranged from 1 to 1,000. Wall time from the first cleanup transaction to
+parsing was 1,879.00 ms, including 26.69 ms of plan capture. P95 uses nearest
+rank. The SELECT plans used a covering staging version index and the covering
+prepared primary key. Plain EXPLAIN showed primary-key range access for both
+sampled DELETEs. Before and after fingerprints matched for both unrelated
+versions' staging, prepared data, metadata, seals and the publication pointer.
+
+The full verifier finished with exit 0 and Python assertions enabled. It ran
+`scripts/verify.py` through a temporary wrapper that sends SIGTERM and requires
+MySQL exit 0 before Compose teardown. It recorded 74 non-integration passes
+in 3.46 s, one baseline migration pass in 0.97 s, and 38 further MySQL
+integration passes in 24.99 s. The existing opt-in two-edition volume test
+was skipped by its own marker. Both Ruff lint checks passed. Ruff format checked
+35 backend files and one verifier script. Docker builds, ignore coverage,
+frontend lint, type checking and build, offline migration SQL, migration
+gates, ETL metadata and protected tmpfs, API outage and recovery, and
+persistence checks passed. Ledger lint and Git whitespace checks passed.
+MySQL exited 0 at each of the three stops in the final verifier run. Docker
+inspection after the run found no disposable containers, volumes, networks,
+or image tags for the verified projects. Both preserved volumes retained
+their expected Docker ownership labels.
+
+The measurement supports 1,000 rows per transaction on this fixture. The
+full October scale, final staging and failure cleanup after parsing, other
+large ETL operations, and the default two-second read timeout during approval
+and publication remain separate work. Q-005 remains investigating and real
+SQL diff performance remains unverified. [ETL recovery guide](docs/M2-ETL.md).
+
 ## 2026-11-25 · PR #6 Section G specialist review fix
 
 The independent Performance Specialist and SEO/GEO Expert found no actionable

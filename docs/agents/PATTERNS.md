@@ -8,6 +8,7 @@
 ## Index
 - PATTERN-001 · Isolated Compose verification · candidate
 - PATTERN-002 · Review seals for immutable ETL snapshots · candidate
+- PATTERN-003 · Bounded recovery under a session lock · candidate
 
 ---
 
@@ -24,3 +25,12 @@ No application patterns are approved for replication.
 - **Date:** 2026-11-18
 - **How:** Bind manual approval to the full source hash, transformation/schema profile, prepared-data fingerprint and reconciled report; publish by changing a dataset pointer in a short locked transaction. Quarantined raw values never enter logs or reports. Temporary raw storage is ephemeral and abandoned unpublished attempts are recovered under a source-content lock.
 - **Example:** backend/app/etl/service.py, backend/app/etl/cli.py and backend/tests/test_etl_database.py establish this practice in M2. Candidate only, not a pattern approved for replication.
+
+## PATTERN-003 · Bounded recovery under a session lock
+- **Status:** candidate
+- **Date:** 2026-11-25
+- **How:** Keep the advisory lock on the same database connection across cleanup
+  transactions. Before each batch, verify lock ownership and protect the target
+  against publication. Delete at most one indexed batch and commit. After an
+  interruption, a new lock owner resumes from the rows still present.
+- **Example:** `backend/app/etl/service.py` and `backend/tests/test_etl_database.py`.
