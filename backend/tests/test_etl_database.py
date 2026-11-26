@@ -1004,6 +1004,323 @@ def retry_protection_snapshot(connection, version):
     )
 
 
+def gate1_ingest_state(pipeline, artifact):
+    with pipeline.engine.connect() as observer:
+        version = observer.execute(
+            select(versions).where(versions.c.sha256 == file_hash(artifact))
+        ).one()
+        history = Counter(
+            observer.scalars(select(attempts.c.state).where(attempts.c.version_id == version.id))
+        )
+        counts = tuple(
+            observer.scalar(
+                select(func.count()).select_from(table).where(table.c.version_id == version.id)
+            )
+            for table in (staging, companies)
+        )
+        return version, history, counts
+
+
+def test_gate1_finalization_batches_preserve_private_prepared_rows(pipeline, tmp_path, monkeypatch):
+    other = pipeline.ingest(csv_file(tmp_path / "prior.csv", [row(39710)]), source())
+    publish(pipeline, other)
+    artifact = csv_file(tmp_path / "finalize.csv", (row(i) for i in range(30000, 32501)))
+    lock_name = digest_json(
+        [
+            pipeline.engine.url.database,
+            source().kind,
+            source().resource_id,
+            PROFILE_VERSION,
+            file_hash(artifact),
+        ]
+    )
+    observed, deleted, sessions = [], [], set()
+    original_hash = pipeline._prepared_hash
+    with pipeline.engine.connect() as connection:
+        before = retry_protection_snapshot(connection, other)
+
+    def observe(connection, _cursor, statement, *_args):
+        if statement.startswith("DELETE FROM etl_staging_rows"):
+            sessions.add(connection.scalar(text("SELECT CONNECTION_ID()")))
+            target, history, counts = gate1_ingest_state(pipeline, artifact)
+            observed.append((target.state, target.report, target.prepared_hash, history, counts))
+            if len(observed) == 1:
+                with pipeline.engine.connect() as observer:
+                    assert (
+                        observer.scalar(text("SELECT IS_USED_LOCK(:name)"), {"name": lock_name})
+                        in sessions
+                    )
+                with pytest.raises(ETLError, match="^version_busy$"):
+                    pipeline.ingest(artifact, source())
+
+    def check_privacy_before_hash(connection, version_id, *args, **kwargs):
+        with pytest.raises(ETLError, match="^version_not_reviewable$"):
+            pipeline.approve(version_id, "unused")
+        with pytest.raises(ETLError, match="^approval_required$"):
+            pipeline.publish(version_id, "unused")
+        with pytest.raises(ETLError, match="^quality_reports_not_validated$"):
+            pipeline.quality_compare(other, version_id)
+        with pytest.raises(ETLError, match="^published_versions_required$"):
+            pipeline.diff(other, version_id)
+        return original_hash(connection, version_id, *args, **kwargs)
+
+    def measure(_connection, cursor, statement, *_args):
+        if statement.startswith(
+            ("DELETE FROM etl_staging_rows", "DELETE FROM company_version_rows")
+        ):
+            deleted.append((statement.split()[2], cursor.rowcount))
+
+    monkeypatch.setattr(pipeline, "_prepared_hash", check_privacy_before_hash)
+    event.listen(pipeline.engine, "before_cursor_execute", observe)
+    event.listen(pipeline.engine, "after_cursor_execute", measure)
+    try:
+        version = pipeline.ingest(artifact, source())
+    finally:
+        event.remove(pipeline.engine, "after_cursor_execute", measure)
+        event.remove(pipeline.engine, "before_cursor_execute", observe)
+
+    assert deleted == [("etl_staging_rows", count) for count in (1000, 1000, 501)]
+    assert len(sessions) == 1
+    assert observed == [
+        ("loading", None, None, {"loading": 1}, (remaining, 2501))
+        for remaining in (2501, 1501, 501)
+    ]
+    target, history, counts = gate1_ingest_state(pipeline, artifact)
+    assert (target.id, target.state, counts, history) == (
+        version,
+        "review",
+        (0, 2501),
+        {"ready": 1},
+    )
+    assert target.report["source_records"] == target.report["accepted_records"] == 2501
+    assert digest_json(target.report) == target.report_hash
+    assert target.prepared_hash and target.approval is None
+    with pipeline.engine.connect() as connection:
+        assert retry_protection_snapshot(connection, other) == before
+
+
+@pytest.mark.parametrize("failure_phase", ["aggregation", "hash"])
+def test_gate1_failed_ingest_drains_bounded_batches(pipeline, tmp_path, monkeypatch, failure_phase):
+    artifact = csv_file(
+        tmp_path / "failure.csv", (row(i, DENUMIRE=failure_phase) for i in range(33000, 35501))
+    )
+    failure_code = (
+        "synthetic_hash_failure" if failure_phase == "hash" else "synthetic_aggregate_failure"
+    )
+    table = "company_version_rows" if failure_phase == "hash" else "etl_staging_rows"
+    observed, deleted = [], []
+
+    def fail_hash(*_args, **_kwargs):
+        raise ETLError(failure_code)
+
+    def observe(_connection, _cursor, statement, *_args):
+        if failure_phase == "aggregation" and "GROUP BY etl_staging_rows.legal_form" in statement:
+            raise ETLError(failure_code)
+        if statement.startswith(f"DELETE FROM {table}"):
+            target, history, counts = gate1_ingest_state(pipeline, artifact)
+            observed.append((target.state, target.report, history, counts))
+
+    def measure(_connection, cursor, statement, *_args):
+        if statement.startswith(f"DELETE FROM {table}"):
+            deleted.append(cursor.rowcount)
+
+    if failure_phase == "hash":
+        monkeypatch.setattr(pipeline, "_prepared_hash", fail_hash)
+    event.listen(pipeline.engine, "before_cursor_execute", observe)
+    event.listen(pipeline.engine, "after_cursor_execute", measure)
+    try:
+        with pytest.raises(ETLError, match=f"^{failure_code}$"):
+            pipeline.ingest(artifact, source())
+    finally:
+        event.remove(pipeline.engine, "after_cursor_execute", measure)
+        event.remove(pipeline.engine, "before_cursor_execute", observe)
+
+    assert deleted == [1000, 1000, 501]
+    assert observed == [
+        (
+            "loading",
+            None,
+            {"loading": 1},
+            (0, remaining) if failure_phase == "hash" else (remaining, 0),
+        )
+        for remaining in (2501, 1501, 501)
+    ]
+    target, history, counts = gate1_ingest_state(pipeline, artifact)
+    assert (target.state, counts, history) == ("failed", (0, 0), {"failed": 1})
+    assert target.report == {
+        "full_file_validated": False,
+        "failure_code": failure_code,
+        "source_records": 2501,
+        "source_kind": "synthetic",
+    }
+    assert target.report_hash == digest_json(target.report)
+    assert target.prepared_hash is None and target.approval is None
+
+
+@pytest.mark.parametrize("failed_ingest", [False, True])
+@pytest.mark.parametrize("committed_batches", [0, 1])
+def test_gate1_interrupted_drain_can_be_recovered(
+    pipeline, tmp_path, monkeypatch, failed_ingest, committed_batches
+):
+    artifact = csv_file(
+        tmp_path / "interrupted-finalization.csv",
+        (row(i, DENUMIRE=tmp_path.name) for i in range(36000, 38501)),
+    )
+    table = "company_version_rows" if failed_ingest else "etl_staging_rows"
+    attempted = []
+
+    def fail_hash(*_args, **_kwargs):
+        raise ETLError("synthetic_hash_failure")
+
+    def interrupt(_connection, cursor, statement, *_args):
+        if statement.startswith(f"DELETE FROM {table}"):
+            attempted.append(cursor.rowcount)
+            if len(attempted) == committed_batches + 1:
+                raise ETLError("synthetic_drain_interrupted")
+
+    with monkeypatch.context() as patches:
+        if failed_ingest:
+            patches.setattr(pipeline, "_prepared_hash", fail_hash)
+        event.listen(pipeline.engine, "after_cursor_execute", interrupt)
+        try:
+            with pytest.raises(ETLError, match="^synthetic_drain_interrupted$"):
+                pipeline.ingest(artifact, source())
+        finally:
+            event.remove(pipeline.engine, "after_cursor_execute", interrupt)
+
+    assert attempted == [1000] * (committed_batches + 1)
+    target, history, counts = gate1_ingest_state(pipeline, artifact)
+    remaining = 2501 - 1000 * committed_batches
+    assert counts == ((0, remaining) if failed_ingest else (remaining, 2501))
+    assert (target.state, target.report, history) == ("loading", None, {"loading": 1})
+    assert pipeline.ingest(artifact, source()) == target.id
+    target, history, counts = gate1_ingest_state(pipeline, artifact)
+    assert (target.state, counts, history) == ("review", (0, 2501), {"abandoned": 1, "ready": 1})
+    assert target.report["source_records"] == target.report["accepted_records"] == 2501
+    assert digest_json(target.report) == target.report_hash
+
+
+@pytest.mark.parametrize("committed", [False, True])
+def test_gate1_uncertain_terminal_commit_stops_writes(pipeline, tmp_path, monkeypatch, committed):
+    artifact = csv_file(
+        tmp_path / "uncertain-terminal.csv", [row(39001, DENUMIRE=f"committed={committed}")]
+    )
+    review_transaction = terminal_connection = None
+    commit_evidence = []
+    reported_error = None
+    later_writes = []
+    commit = pipeline.engine.dialect.do_commit
+
+    def observe(connection, _cursor, statement, _parameters, context, _many):
+        nonlocal review_transaction, terminal_connection
+        if commit_evidence and statement.startswith(("DELETE", "UPDATE", "INSERT")):
+            later_writes.append(statement.split()[0])
+        if (
+            statement.startswith("UPDATE etl_versions")
+            and context.compiled_parameters[0].get("state") == "review"
+        ):
+            review_transaction = connection.get_transaction()
+        elif (
+            statement.startswith("UPDATE etl_attempts")
+            and context.compiled_parameters[0].get("state") == "ready"
+        ):
+            assert review_transaction is not None
+            assert connection.get_transaction() is review_transaction
+            terminal_connection = connection.connection
+
+    def uncertain_commit(dbapi):
+        if dbapi is terminal_connection and not commit_evidence:
+            if committed:
+                commit(dbapi)
+            else:
+                dbapi.rollback()
+            # The writer is still checked out, so this reads from another MySQL session.
+            target, history, counts = gate1_ingest_state(pipeline, artifact)
+            commit_evidence.append((target.state, history, counts))
+            raise OperationalError(None, None, RuntimeError(1205))
+        commit(dbapi)
+
+    with monkeypatch.context() as patches:
+        patches.setattr(pipeline.engine.dialect, "do_commit", uncertain_commit)
+        event.listen(pipeline.engine, "before_cursor_execute", observe)
+        try:
+            pipeline.ingest(artifact, source())
+        except ETLError as error:
+            reported_error = error
+        finally:
+            event.remove(pipeline.engine, "before_cursor_execute", observe)
+
+    assert len(commit_evidence) == 1, "Fault injection did not reach the terminal commit"
+    assert commit_evidence == [
+        ("review", {"ready": 1}, (0, 1)) if committed else ("loading", {"loading": 1}, (0, 1))
+    ]
+    assert str(reported_error) == "database_error"
+    target, history, counts = gate1_ingest_state(pipeline, artifact)
+    assert later_writes == [], (
+        f"After fault injection observer saw {commit_evidence[0]}. "
+        f"After ingest returned, observer saw {(target.state, history, counts)}."
+    )
+    assert counts == (0, 1)
+    assert (target.state, history) == (
+        ("review", {"ready": 1}) if committed else ("loading", {"loading": 1})
+    )
+    assert pipeline.ingest(artifact, source()) == target.id
+    target, history, counts = gate1_ingest_state(pipeline, artifact)
+    assert target.state == "review"
+    assert counts == (0, 1)
+    assert history == ({"ready": 1, "reused": 1} if committed else {"abandoned": 1, "ready": 1})
+    assert target.prepared_hash and target.report_hash == digest_json(target.report)
+
+
+@pytest.mark.parametrize("changed", ["canonical_pointer", "attempt", "staging"])
+def test_gate1_terminal_commit_revalidates_invariants(pipeline, tmp_path, monkeypatch, changed):
+    artifact = csv_file(tmp_path / "terminal.csv", [row(39601, DENUMIRE=changed)])
+    original_hash = pipeline._prepared_hash
+    previous = None
+    pointer_changed = False
+
+    def change_after_hash(connection, version_id, *args, **kwargs):
+        nonlocal previous, pointer_changed
+        hashed = original_hash(connection, version_id, *args, **kwargs)
+        with pipeline.engine.begin() as outsider:
+            if changed == "canonical_pointer":
+                previous = outsider.scalar(select(publications.c.current_version_id))
+                assert version_id != version_id.upper()
+                outsider.execute(update(publications).values(current_version_id=version_id.upper()))
+            elif changed == "attempt":
+                outsider.execute(
+                    update(attempts)
+                    .where(attempts.c.version_id == version_id)
+                    .values(state="abandoned")
+                )
+            else:
+                outsider.execute(
+                    insert(staging).values(
+                        version_id=version_id, source_line=2, valid=False, excluded=False, errors=[]
+                    )
+                )
+        pointer_changed = changed == "canonical_pointer"
+        return hashed
+
+    if changed == "canonical_pointer":
+        fixed = iter(("00000000-0000-4000-abcd-000000039601", "synthetic-gate1-terminal-attempt"))
+        monkeypatch.setattr("app.etl.service.uuid4", lambda: next(fixed))
+    monkeypatch.setattr(pipeline, "_prepared_hash", change_after_hash)
+    try:
+        with pytest.raises(ETLError):
+            pipeline.ingest(artifact, source())
+        target, history, counts = gate1_ingest_state(pipeline, artifact)
+        assert target.state == "loading" and target.report is None and target.prepared_hash is None
+        assert (history, counts) == (
+            ({"abandoned": 1} if changed == "attempt" else {"loading": 1}),
+            (int(changed == "staging"), 1),
+        )
+    finally:
+        if pointer_changed:
+            with pipeline.engine.begin() as connection:
+                connection.execute(update(publications).values(current_version_id=previous))
+
+
 @pytest.mark.parametrize("phase", ["preparation", "batch"])
 def test_retry_cleanup_rejects_case_equivalent_publication_pointer(
     pipeline, tmp_path, monkeypatch, phase

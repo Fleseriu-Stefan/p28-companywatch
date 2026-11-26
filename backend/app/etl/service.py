@@ -146,7 +146,7 @@ def ingest_operation(connection, operation):
 
 
 @contextmanager
-def ingest_transaction(connection, lock_name):
+def ingest_transaction(connection, lock_name, *, terminal=False):
     started_at = monotonic()
     if connection.invalidated:
         log_ingest_operation(logging.WARNING, "check_lock", "connection_invalidated", started_at)
@@ -180,6 +180,9 @@ def ingest_transaction(connection, lock_name):
             log_ingest_sql_failure(connection, phase, started_at, error)
         if connection.invalidated:
             raise ETLError("ingest_lock_lost") from None
+        if terminal and phase == "commit_transaction":
+            # The server may already have committed. End this session without further writes.
+            connection.invalidate()
         raise
     else:
         if logger.isEnabledFor(logging.DEBUG):
@@ -206,11 +209,32 @@ def lock_publication_pointer(connection):
     return current_version
 
 
-def clear_retry_rows(connection, lock_name, version_id):
+def check_loading_version(connection, version_id, attempt_id):
+    current_version = lock_publication_pointer(connection)
+    with ingest_operation(connection, "check_retry_version"):
+        state = connection.scalar(
+            select(versions.c.state).where(versions.c.id == version_id).with_for_update()
+        )
+    if state != "loading" or current_version == version_id:
+        raise ETLError("retry_cleanup_not_allowed")
+    if attempt_id is not None:
+        with ingest_operation(connection, "check_loading_attempt"):
+            attempt_state = connection.scalar(
+                select(attempts.c.state)
+                .where(attempts.c.id == attempt_id, attempts.c.version_id == version_id)
+                .with_for_update()
+            )
+        if attempt_state != "loading":
+            raise ETLError("ingest_attempt_not_loading")
+
+
+def clear_retry_rows(connection, lock_name, version_id, *, attempt_id=None, phase="retry"):
     for table, key, label in (
         (staging, staging.c.id, "staging"),
         (companies, companies.c.euid, "prepared"),
     ):
+        if table is companies and phase == "final":
+            break
         scope = table.c.version_id == version_id
         batch = select(key).where(scope).limit(RETRY_BATCH_SIZE)
         if table is staging:
@@ -218,21 +242,51 @@ def clear_retry_rows(connection, lock_name, version_id):
             batch = batch.with_hint(staging, "FORCE INDEX (ix_etl_staging_version_key)", "mysql")
         while True:
             with ingest_transaction(connection, lock_name):
-                current_version = lock_publication_pointer(connection)
-                with ingest_operation(connection, "check_retry_version"):
-                    state = connection.scalar(
-                        select(versions.c.state)
-                        .where(versions.c.id == version_id)
-                        .with_for_update()
-                    )
-                if state != "loading" or current_version == version_id:
-                    raise ETLError("retry_cleanup_not_allowed")
-                with ingest_operation(connection, f"select_retry_{label}_batch"):
+                check_loading_version(connection, version_id, attempt_id)
+                with ingest_operation(connection, f"select_{phase}_{label}_batch"):
                     keys = connection.scalars(batch).all()
                 if not keys:
                     break
-                with ingest_operation(connection, f"delete_retry_{label}_batch"):
+                with ingest_operation(connection, f"delete_{phase}_{label}_batch"):
                     connection.execute(delete(table).where(scope, key.in_(keys)))
+
+
+def record_ingest_outcome(
+    connection, lock_name, version_id, attempt_id, report, *, prepared_hash=None, failure_code=None
+):
+    failed = failure_code is not None
+    with ingest_transaction(connection, lock_name, terminal=True):
+        check_loading_version(connection, version_id, attempt_id)
+        with ingest_operation(connection, "check_ingest_outcome_rows"):
+            for table, expected_rows in (
+                (staging, 0),
+                (companies, report.get("accepted_records", 0)),
+            ):
+                any_rows = connection.scalar(
+                    select(table.c.version_id)
+                    .where(table.c.version_id == version_id)
+                    .limit(1)
+                    .with_for_update(read=True)
+                )
+                if (any_rows is not None) != bool(expected_rows):
+                    raise ETLError("ingest_outcome_rows_mismatch")
+        operation = "record_failed_attempt" if failed else "record_review"
+        with ingest_operation(connection, operation):
+            connection.execute(
+                update(versions)
+                .where(versions.c.id == version_id)
+                .values(
+                    state="failed" if failed else "review",
+                    report=report,
+                    report_hash=digest_json(report),
+                    prepared_hash=prepared_hash,
+                )
+            )
+            connection.execute(
+                update(attempts)
+                .where(attempts.c.id == attempt_id)
+                .values(state="failed" if failed else "ready", failure_code=failure_code)
+            )
 
 
 class Pipeline:
@@ -374,7 +428,7 @@ class Pipeline:
         if candidate != version_id:
             # Keep recovery outside the parser's failure handler. A successor can
             # resume committed cleanup; never fall back to an unbounded delete.
-            clear_retry_rows(connection, lock_name, version_id)
+            clear_retry_rows(connection, lock_name, version_id, attempt_id=attempt_id)
 
         counters, reasons, nulls = Counter(), Counter(), Counter()
         source_forms = dict.fromkeys((*sorted(LEGAL_FORMS), "missing", "other"), 0)
@@ -383,6 +437,7 @@ class Pipeline:
         # in this worker; keyed digests and staging rows are deleted on completion.
         identity_secret = secrets.token_bytes(32)
         examples, batch = [], []
+        clearing_staging = False
         try:
             for ordinal, row in records(path):
                 counters["source_records"] += 1
@@ -507,27 +562,21 @@ class Pipeline:
                 }
                 if report["source_records"] != accepted + quarantined + report["excluded_records"]:
                     raise ETLError("quality_totals_mismatch")
-                with ingest_operation(connection, "clear_staging"):
-                    connection.execute(delete(staging).where(scope))
-            with ingest_transaction(connection, lock_name):
-                with ingest_operation(connection, "hash_prepared_rows"):
-                    prepared_hash = self._prepared_hash(connection, version_id)
-                with ingest_operation(connection, "record_review"):
-                    connection.execute(
-                        update(versions)
-                        .where(versions.c.id == version_id)
-                        .values(
-                            state="review",
-                            report=report,
-                            report_hash=digest_json(report),
-                            prepared_hash=prepared_hash,
-                        )
-                    )
-                    connection.execute(
-                        update(attempts).where(attempts.c.id == attempt_id).values(state="ready")
-                    )
-            return version_id
+            clearing_staging = True
+            clear_retry_rows(
+                connection, lock_name, version_id, attempt_id=attempt_id, phase="final"
+            )
+            clearing_staging = False
+            with (
+                ingest_transaction(connection, lock_name),
+                ingest_operation(connection, "hash_prepared_rows"),
+            ):
+                # Only the advisory-lock owner can change prepared rows while they are loading.
+                prepared_hash = self._prepared_hash(connection, version_id, expected_rows=accepted)
         except (ETLError, OSError, *INGEST_DATABASE_ERRORS) as error:
+            if clearing_staging:
+                # Committed cleanup batches are recoverable by a successor of this attempt.
+                raise
             code = (
                 str(error)
                 if isinstance(error, ETLError)
@@ -537,36 +586,32 @@ class Pipeline:
             )
             if connection.invalidated or code == "ingest_lock_lost":
                 raise ETLError("ingest_lock_lost") from None
-            with (
-                ingest_transaction(connection, lock_name),
-                ingest_operation(connection, "record_failed_attempt"),
-            ):
-                connection.execute(delete(staging).where(staging.c.version_id == version_id))
-                connection.execute(delete(companies).where(companies.c.version_id == version_id))
-                report = {
-                    "full_file_validated": False,
-                    "failure_code": code,
-                    "source_records": counters["source_records"],
-                    "source_kind": source.kind,
-                }
-                connection.execute(
-                    update(versions)
-                    .where(versions.c.id == version_id)
-                    .values(state="failed", report=report, report_hash=digest_json(report))
-                )
-                connection.execute(
-                    update(attempts)
-                    .where(attempts.c.id == attempt_id)
-                    .values(state="failed", failure_code=code)
-                )
+            failure_report = {
+                "full_file_validated": False,
+                "failure_code": code,
+                "source_records": counters["source_records"],
+                "source_kind": source.kind,
+            }
+            clear_retry_rows(
+                connection, lock_name, version_id, attempt_id=attempt_id, phase="failure"
+            )
+            record_ingest_outcome(
+                connection, lock_name, version_id, attempt_id, failure_report, failure_code=code
+            )
             raise ETLError(code) from None
+        # A missing commit acknowledgment must never route back through failure cleanup.
+        record_ingest_outcome(
+            connection, lock_name, version_id, attempt_id, report, prepared_hash=prepared_hash
+        )
+        return version_id
 
     def _stage(self, connection, lock_name, batch):
         with ingest_transaction(connection, lock_name), ingest_operation(connection, "stage_batch"):
             connection.execute(insert(staging), batch)
 
-    def _prepared_hash(self, connection, version_id):
+    def _prepared_hash(self, connection, version_id, *, expected_rows=None):
         digest = hashlib.sha256()
+        row_count = 0
         with connection.execute(
             select(*(companies.c[key] for key in FIELDS))
             .where(companies.c.version_id == version_id)
@@ -574,10 +619,13 @@ class Pipeline:
             .execution_options(stream_results=True)
         ) as result:
             for row in result:
+                row_count += 1
                 digest.update(
                     json.dumps(list(row), ensure_ascii=False, separators=(",", ":")).encode()
                 )
                 digest.update(b"\n")
+        if expected_rows is not None and row_count != expected_rows:
+            raise ETLError("quality_totals_mismatch")
         return digest.hexdigest()
 
     def report(self, version_id):
