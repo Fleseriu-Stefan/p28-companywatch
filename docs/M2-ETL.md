@@ -62,16 +62,15 @@ pentru un câmp foarte mare produce eroare de fișier, nu pierdere de conținut.
    Valorile necunoscute nu apar în raport. A doua numără SRL, SA și SNC după
    validare și carantinarea duplicatelor. Totalurile corespund cu
    `source_records`, respectiv `accepted_records`.
-9. La succes, snapshotul minim este pregătit, staging-ul este șters și versiunea
-   intră în `review`. Dacă ingestia eșuează după începerea parsării și workerul
-   păstrează conexiunea validă și lock-ul de sesiune, acesta șterge staging-ul
-   și rândurile pregătite ale versiunii
-   nepublicate, marchează versiunea și încercarea `failed` și păstrează un raport
-   agregat de eroare. Dacă conexiunea este invalidată sau lock-ul este pierdut,
-   workerul se oprește fără curățare nesigură; staging-ul deja comis și starea
-   `loading` pot rămâne până la recuperarea sub lock descrisă mai jos. Erorile
-   din curățarea de reluare, înaintea parsării, pot lăsa versiunea în `loading`
-   chiar dacă sesiunea rămâne validă. Vezi [recuperarea M2.3B](#m23b--curățare-la-reluarea-ingestiei).
+9. La succes, rândurile pregătite rămân private în starea `loading` cât timp
+   staging-ul este șters în loturi. Raportul complet, amprentele și stările
+   `review` și `ready` devin vizibile împreună. La un eșec recunoscut în
+   parsare, validare sau calculul amprentei, workerul poate înregistra stările
+   `failed` numai dacă sesiunea MySQL rămâne validă și deține lock-ul de
+   ingestie până la tranzacția finală. O deconectare sau pierderea lock-ului
+   poate întrerupe curățarea înainte de înregistrarea raportului de eroare și
+   poate lăsa încercarea în `loading` pentru recuperarea M2.3B.
+   Vezi [finalizarea M2.3C](#m23c--finalizare-și-curățare-la-eșec).
 
 Cele cinci tabele M2 sunt `etl_versions` (inclusiv manifest și raport),
 `etl_attempts`, `etl_staging_rows`, `company_version_rows`, `dataset_publications`.
@@ -175,9 +174,51 @@ capturarea planurilor. Selecțiile au folosit indexul
 `ix_etl_staging_version_key` și cheia primară a snapshoturilor. Celelalte
 versiuni și pointerul au trecut comparația de conținut înainte și după.
 Rezultatul susține limita de 1.000 de rânduri pe configurația măsurată.
-Curățarea finală și la eșec după parsare, testul la 4,23 milioane de
-rânduri, verificarea sigiliilor cu limita implicită de 2 s și performanța
-diff-ului pe date reale rămân de verificat separat.
+
+### M2.3C — finalizare și curățare la eșec
+
+Finalizarea comite validarea și copierea rândurilor pregătite în timp ce
+versiunea și încercarea sunt încă `loading`. Șterge numai staging-ul, în
+tranzacții de cel mult 1.000 de rânduri. Workerul calculează amprenta rândurilor
+pregătite și verifică numărul lor față de raport fără să țină lock-ul
+pointerului de publicare pe durata citirii. Rândurile și raportul complet
+devin eligibile pentru revizuire abia când raportul, amprentele și stările
+`review` și `ready` sunt comise împreună.
+
+La eșec, workerul capturează raportul agregat înainte de ștergerea în loturi a
+staging-ului și a rândurilor pregătite. După golirea ambelor tabele pentru
+versiunea vizată, raportul de eroare și stările `failed` sunt comise împreună,
+cu o sesiune MySQL validă care încă deține lock-ul de ingestie.
+Fiecare lot și tranziția finală folosesc sesiunea care deține lock-ul de
+ingestie. Ele verifică pointerul canonic înaintea versiunii și verifică
+încercarea activă. Tranziția verifică și prezența sau absența rândurilor
+așteptate în cele două tabele. Aprobarea, publicarea, comparația rapoartelor
+și citirea snapshoturilor verifică starea versiunii.
+
+O deconectare sau pierderea lock-ului poate opri workerul înainte ca raportul
+de eroare să fie înregistrat. Loturile comise rămân șterse, iar o încercare
+rămasă în `loading` este reluată prin
+[recuperarea M2.3B](#m23b--curățare-la-reluarea-ingestiei).
+La o confirmare incertă a commitului final, workerul oprește
+scrierile și închide sesiunea. Workerul următor decide pe baza stării
+comise dacă reutilizează versiunea sau o reface prin recuperarea M2.3B.
+
+Cele 12 cazuri MySQL au trecut după implementare, după 12 eșecuri așteptate
+pe versiunea de bază. Verificarea completă a trecut în proiecte sintetice
+izolate, cu oprire grațioasă MySQL și verificarea eliminării resurselor de
+test. [Rezultate și condiții de izolare](../AI_LOG.md#m23c-gate-1--bounded-finalization-build).
+
+Limita de citire pentru ingestie este de 120 s. Agregările de duplicate,
+actualizarea carantinei, agregările de calitate, copierea rândurilor și
+calculul amprentei pot genera încă operații mari. Q-013 și Q-014 rămân
+în investigare. Verificarea sintetică la 4.229.451 de rânduri, scalabilitatea
+aprobării și publicării și performanța diff-ului real au verificări separate.
+
+Gate 2 (Q-013) va măsura întârzierea purge-ului InnoDB la curățarea de
+reluare, la finalizarea cu succes, la curățarea după eșec și la verificarea
+finală că staging-ul este gol. Gate 4 va măsura spațiul simultan ocupat de
+staging și rândurile pregătite, spațiul pentru undo și rezerva necesară
+pentru recuperare după întrerupere.
 
 ## Aprobare, publicare și diff
 

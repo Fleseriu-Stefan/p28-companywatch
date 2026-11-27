@@ -1,5 +1,159 @@
 # AI log
 
+## 2026-11-27 · PR #8 Section G remediation
+
+The owner accepted all three specialist passes for PR #8 at
+`345f2962b1a380da5d4c238ecf33d8bbcb5c886e` against
+`750af84da07a0e4f682d5cb5724820ecec7043b9`. The initial GitHub Actions run
+45829550271 passed on that head.
+
+The terminal canonical-pointer regression now requires the injected pointer
+change after hashing, verifies the uppercase pointer on an independent MySQL
+connection, and expects the exact `retry_cleanup_not_allowed` error. The
+original checks for the loading state, report, hash, attempt, and row counts
+remain. The ETL guide now explains that a valid session and continued advisory
+lock ownership are required to record `failed`. Disconnect or lock loss can
+stop cleanup before the failure report is committed and leave the attempt
+`loading` for M2.3B recovery.
+
+The owner deferred both performance recommendations. Gate 2 (Q-013) will
+measure purge lag for retry, successful finalization, failure cleanup, and
+the terminal staging emptiness probe. Gate 4 will measure simultaneous
+staging and prepared-row storage, undo footprint, and recovery headroom.
+Q-005, Q-013, and Q-014 remain investigating, PATTERN-003 remains a
+candidate, and Gates 2–4 and real-data validation remain pending.
+
+The first focused invocation stopped at Ruff E501 before starting MySQL.
+The wrapper verified cleanup of `companywatch-check-850f6b85e6bf6bf2`.
+After splitting the long assertion across two lines, the approved wrapper
+passed all 12 focused cases in 7.58 s with assertions enabled on
+`companywatch-check-7d52f628a61591ea`. Ruff lint and format, ledger lint,
+Git whitespace checks, and the focused invocation's Compose smoke checks
+passed. The wrapper verified graceful MySQL exit 0 at all three shutdowns
+and removal of the disposable containers, volume, network, and image tags.
+Read-only metadata checks confirmed both protected volume ownership labels.
+The full local suite was skipped for this test and documentation change.
+The complete CI workflow must pass on the remediation head after push.
+
+## 2026-11-26 · M2.3C Gate 1 test-first preparation
+
+The owner approved the M2.3C plan and authorized Gate 1 only. After a fetch
+and fast-forward-only pull, local main, its tracking ref, and the live remote
+main all resolved to `750af84da07a0e4f682d5cb5724820ecec7043b9`. The build
+uses the local branch `fix/m2-3c-etl-finalization`.
+
+The ledger records the owner's 2026-11-26 confirmations for D-001,
+D-003 through D-009, C-002, PATTERN-001 through PATTERN-003 for awareness,
+and Q-003, Q-005, Q-008, Q-010, Q-013, and Q-014. Q-010 confirms the real
+benchmark protocol only. The patterns remain candidates and Q-005, Q-013,
+and Q-014 remain investigating.
+
+Five new MySQL test functions cover 12 cases for bounded finalization and
+failure cleanup, loading-state visibility, interruption and retry, terminal
+commit acknowledgment, and terminal eligibility. An AST comparison confirmed
+all 33 pre-existing test functions were preserved. Ruff lint and format checks
+for the test file, ledger lint, and `git diff --check` passed.
+
+The owner separately approved focused RED with the reviewed, temporary
+graceful-shutdown wrapper (SHA-256
+`ca3a987ba6b1a2f661ca7649be6b7bb4da73082ac2f2327bb0dc7112f4c66f18`).
+With assertions enabled, focused collection matched all 12 expected cases
+and pytest reported 12 failed and 0 passed in 3.44 s. Ten failures
+demonstrated the baseline's whole-version deletes, missing batch interruption
+boundaries, or missing terminal revalidation. The two uncertain-commit cases
+reported `DID NOT RAISE ETLError`. Those results do not establish that the
+injected commit fault reached the terminal transaction and are not accepted
+as RED evidence. They need a test-setup diagnosis before implementation.
+
+The wrapper verified a graceful MySQL exit of 0 for
+`companywatch-check-89315e63a8500cb2` and confirmed that its containers,
+volume, network, and image tags were removed. Both protected volumes retained
+their expected ownership labels. The ETL service and repository verifier
+still match the baseline. GREEN, the complete verifier, October-scale
+synthetic validation, and real SQL diff performance remain pending.
+
+### M2.3C Gate 1 · corrected terminal-commit RED
+
+The owner authorized a test-only correction for the two unverified cases.
+The baseline transaction in `Pipeline._ingest` hashes the prepared rows
+and writes version `review` and attempt `ready` together in the
+`record_review` block. The original hook compared the raw PyMySQL connection
+with the pool proxy passed to SQLAlchemy's `do_commit`, so the injected fault
+never ran. The corrected test confirms that both writes use the same
+transaction, matches the pool proxy, and verifies the actual rollback or
+commit on an independent MySQL session before raising the simulated error.
+All 33 original test functions and the other 10 Gate 1 cases were preserved.
+
+The same approved wrapper selected all 12 focused nodes. Pytest reported
+12 failed and 0 passed in 3.48 s. The previous ten failures reproduced.
+Both corrected cases reached `commit_transaction` with the injected code
+1205 and verified exactly one fault. The observer saw version/attempt
+`loading`/`loading` after rollback and `review`/`ready` after commit.
+Each observation showed zero staging rows and one prepared row. After
+the fault, baseline failure cleanup attempted two deletes and two updates.
+The final observer saw `failed`/`failed` and zero prepared rows in both
+cases. Both corrected failures now demonstrate a baseline defect.
+
+Ruff lint and format, ledger lint, and `git diff --check` passed. The
+wrapper verified MySQL exit 0 for `companywatch-check-24aa9e8da407c0b0`
+and confirmed removal of its containers, volume, network, and image tags.
+Both protected volumes retained their ownership labels in the read-only
+metadata checks. The application service, repository verifier, and
+temporary wrapper were unchanged. Implementation and GREEN await approval.
+
+### M2.3C Gate 1 · bounded finalization BUILD
+
+The owner accepted the 12 genuine RED cases and approved Gate 1 implementation
+on `fix/m2-3c-etl-finalization` from `750af84da07a0e4f682d5cb5724820ecec7043b9`.
+The service now shares the existing indexed cleanup loop across retry,
+finalization, and failure. Finalization deletes only staging. Recognized
+failures capture the existing aggregate failure report before draining staging
+and prepared rows. Each committed delete is capped at 1,000 rows. Each batch
+and terminal transaction uses the advisory-lock session and checks the
+canonical publication pointer, loading version, and active loading attempt
+in that order.
+
+The complete report, its hashes, and the version and attempt states become
+visible in one terminal transaction. The ingest hash stream checks the
+prepared count outside the shared publication pointer lock. The terminal
+transaction checks the expected presence or absence of rows in both tables.
+An interrupted cleanup leaves committed batches drained and lets a successor
+recover the remainder. A terminal commit error stops further writes and
+discards the session when it is still valid. The two fault cases verified
+that the successor rebuilds if the terminal transaction rolled back and reuses
+the intact version if MySQL committed it.
+
+The diagnostics mock now returns loading states and empty cleanup results to
+exercise the new checks. This mechanical fixture change preserves every
+original assertion and exception expectation. All 33 original integration
+test functions and the approved RED case assertions were preserved. The
+initial Ruff pass identified E501 and B007 in the service, and a later format
+check identified a blank line in the mock fixture. These were corrected before
+verification.
+
+- Focused GREEN exited 0 with 12 passes in 5.24 s on
+  `companywatch-check-d8be090bb1d3793e`. The focused invocation also passed
+  the non-integration suite, baseline migration test, and Compose smoke checks.
+- The full verifier exited 0 on `companywatch-check-cb499531c9ac548e`.
+  It passed 74 non-integration tests in 3.58 s, the historical baseline
+  migration test in 0.99 s, and 54 additional MySQL integration tests in
+  33.04 s. The existing opt-in two-edition volume test was skipped by its marker.
+  Docker builds, Ruff lint and format, frontend lint/typecheck/build, migration
+  gates, raw tmpfs, API checks, outage recovery, and persistence passed.
+- Both runs used the approved wrapper with assertions enabled and its SHA-256
+  checked before execution. The wrapper verified MySQL exit 0 at all three
+  shutdowns in each project and verified no project containers, volume, network,
+  or image tags remained. Read-only metadata checks confirmed the expected
+  ownership labels on both protected volumes.
+- Ledger lint, Git whitespace and ignore checks, changed documentation links,
+  and skill and agent frontmatter passed.
+
+The ingest read timeout remains 120 s. Full-range aggregation, quarantine,
+prepared-row copy, and hashing remain scale-sensitive. Q-005, Q-013, and Q-014
+remain investigating and PATTERN-003 remains a candidate. Gates 2–4,
+October-scale synthetic validation, and real SQL diff performance remain pending.
+[ETL lifecycle documentation](docs/M2-ETL.md#m23c--finalizare-și-curățare-la-eșec)
+
 ## 2026-11-25 · PR #7 Section G specialist review and remediation
 
 Three independent specialists reviewed PR #7 at `dd5faac0`. The Security

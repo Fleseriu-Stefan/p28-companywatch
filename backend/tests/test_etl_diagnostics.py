@@ -2,12 +2,12 @@ from unittest.mock import MagicMock
 
 import pytest
 from pymysql.err import OperationalError as MySQLOperationalError
-from sqlalchemy import Insert
+from sqlalchemy import Insert, Select
 from sqlalchemy.exc import OperationalError
 
 from app.etl import service
 from app.etl.errors import ETLError
-from app.etl.models import staging
+from app.etl.models import attempts, companies, staging, versions
 from app.etl.service import Pipeline, ingest_operation, ingest_transaction
 from tests.etl_fixtures import csv_file, row, source
 
@@ -41,7 +41,19 @@ def test_ingest_database_failure_is_safe_in_pytest_output(
     engine.url.database = "companywatch_test"
     connection = engine.connect.return_value.__enter__.return_value
     connection.invalidated = False
-    connection.scalar.return_value = 1
+
+    # The failure handler now checks loading state and verifies empty cleanup targets.
+    def scalar(statement, *args):
+        if isinstance(statement, Select):
+            column = next(iter(statement.selected_columns))
+            if column is attempts.c.state or column is versions.c.state:
+                return "loading"
+            if column is staging.c.version_id or column is companies.c.version_id:
+                return None
+        return 1
+
+    connection.scalar.side_effect = scalar
+    connection.scalars.return_value.all.return_value = []
     generated_ids = iter(("synthetic-version", "synthetic-attempt"))
     monkeypatch.setattr(service, "uuid4", lambda: next(generated_ids))
     connection.execute.return_value.mappings.return_value.one.return_value = {
