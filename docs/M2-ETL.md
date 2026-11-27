@@ -65,10 +65,11 @@ pentru un câmp foarte mare produce eroare de fișier, nu pierdere de conținut.
 9. La succes, rândurile pregătite rămân private în starea `loading` cât timp
    staging-ul este șters în loturi. Raportul complet, amprentele și stările
    `review` și `ready` devin vizibile împreună. La un eșec recunoscut în
-   parsare, validare sau calculul amprentei, workerul capturează raportul agregat
-   de eroare, șterge staging-ul și rândurile pregătite în loturi, apoi marchează
-   versiunea și încercarea `failed` împreună. O întrerupere a curățării poate
-   lăsa versiunea în `loading` pentru recuperarea sub lock.
+   parsare, validare sau calculul amprentei, workerul poate înregistra stările
+   `failed` numai dacă sesiunea MySQL rămâne validă și deține lock-ul de
+   ingestie până la tranzacția finală. O deconectare sau pierderea lock-ului
+   poate întrerupe curățarea înainte de înregistrarea raportului de eroare și
+   poate lăsa încercarea în `loading` pentru recuperarea M2.3B.
    Vezi [finalizarea M2.3C](#m23c--finalizare-și-curățare-la-eșec).
 
 Cele cinci tabele M2 sunt `etl_versions` (inclusiv manifest și raport),
@@ -184,17 +185,21 @@ pointerului de publicare pe durata citirii. Rândurile și raportul complet
 devin eligibile pentru revizuire abia când raportul, amprentele și stările
 `review` și `ready` sunt comise împreună.
 
-La eșec, raportul agregat se capturează înainte de ștergerea în loturi a
-staging-ului și a rândurilor pregătite. Raportul de eroare și stările `failed`
-sunt comise împreună după golirea ambelor tabele pentru versiunea vizată.
+La eșec, workerul capturează raportul agregat înainte de ștergerea în loturi a
+staging-ului și a rândurilor pregătite. După golirea ambelor tabele pentru
+versiunea vizată, raportul de eroare și stările `failed` sunt comise împreună,
+cu o sesiune MySQL validă care încă deține lock-ul de ingestie.
 Fiecare lot și tranziția finală folosesc sesiunea care deține lock-ul de
 ingestie. Ele verifică pointerul canonic înaintea versiunii și verifică
 încercarea activă. Tranziția verifică și prezența sau absența rândurilor
 așteptate în cele două tabele. Aprobarea, publicarea, comparația rapoartelor
 și citirea snapshoturilor verifică starea versiunii.
 
-La întreruperea curățării sau pierderea lock-ului, loturile comise rămân
-șterse. La o confirmare incertă a commitului final, workerul oprește
+O deconectare sau pierderea lock-ului poate opri workerul înainte ca raportul
+de eroare să fie înregistrat. Loturile comise rămân șterse, iar o încercare
+rămasă în `loading` este reluată prin
+[recuperarea M2.3B](#m23b--curățare-la-reluarea-ingestiei).
+La o confirmare incertă a commitului final, workerul oprește
 scrierile și închide sesiunea. Workerul următor decide pe baza stării
 comise dacă reutilizează versiunea sau o reface prin recuperarea M2.3B.
 
@@ -208,6 +213,12 @@ actualizarea carantinei, agregările de calitate, copierea rândurilor și
 calculul amprentei pot genera încă operații mari. Q-013 și Q-014 rămân
 în investigare. Verificarea sintetică la 4.229.451 de rânduri, scalabilitatea
 aprobării și publicării și performanța diff-ului real au verificări separate.
+
+Gate 2 (Q-013) va măsura întârzierea purge-ului InnoDB la curățarea de
+reluare, la finalizarea cu succes, la curățarea după eșec și la verificarea
+finală că staging-ul este gol. Gate 4 va măsura spațiul simultan ocupat de
+staging și rândurile pregătite, spațiul pentru undo și rezerva necesară
+pentru recuperare după întrerupere.
 
 ## Aprobare, publicare și diff
 

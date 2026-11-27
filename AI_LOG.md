@@ -1,5 +1,40 @@
 # AI log
 
+## 2026-11-27 · PR #8 Section G remediation
+
+The owner accepted all three specialist passes for PR #8 at
+`345f2962b1a380da5d4c238ecf33d8bbcb5c886e` against
+`750af84da07a0e4f682d5cb5724820ecec7043b9`. The initial GitHub Actions run
+45829550271 passed on that head.
+
+The terminal canonical-pointer regression now requires the injected pointer
+change after hashing, verifies the uppercase pointer on an independent MySQL
+connection, and expects the exact `retry_cleanup_not_allowed` error. The
+original checks for the loading state, report, hash, attempt, and row counts
+remain. The ETL guide now explains that a valid session and continued advisory
+lock ownership are required to record `failed`. Disconnect or lock loss can
+stop cleanup before the failure report is committed and leave the attempt
+`loading` for M2.3B recovery.
+
+The owner deferred both performance recommendations. Gate 2 (Q-013) will
+measure purge lag for retry, successful finalization, failure cleanup, and
+the terminal staging emptiness probe. Gate 4 will measure simultaneous
+staging and prepared-row storage, undo footprint, and recovery headroom.
+Q-005, Q-013, and Q-014 remain investigating, PATTERN-003 remains a
+candidate, and Gates 2–4 and real-data validation remain pending.
+
+The first focused invocation stopped at Ruff E501 before starting MySQL.
+The wrapper verified cleanup of `companywatch-check-850f6b85e6bf6bf2`.
+After splitting the long assertion across two lines, the approved wrapper
+passed all 12 focused cases in 7.58 s with assertions enabled on
+`companywatch-check-7d52f628a61591ea`. Ruff lint and format, ledger lint,
+Git whitespace checks, and the focused invocation's Compose smoke checks
+passed. The wrapper verified graceful MySQL exit 0 at all three shutdowns
+and removal of the disposable containers, volume, network, and image tags.
+Read-only metadata checks confirmed both protected volume ownership labels.
+The full local suite was skipped for this test and documentation change.
+The complete CI workflow must pass on the remediation head after push.
+
 ## 2026-11-26 · M2.3C Gate 1 test-first preparation
 
 The owner approved the M2.3C plan and authorized Gate 1 only. After a fetch

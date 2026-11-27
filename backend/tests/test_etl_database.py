@@ -1307,9 +1307,15 @@ def test_gate1_terminal_commit_revalidates_invariants(pipeline, tmp_path, monkey
         monkeypatch.setattr("app.etl.service.uuid4", lambda: next(fixed))
     monkeypatch.setattr(pipeline, "_prepared_hash", change_after_hash)
     try:
-        with pytest.raises(ETLError):
+        with pytest.raises(ETLError) as raised:
             pipeline.ingest(artifact, source())
         target, history, counts = gate1_ingest_state(pipeline, artifact)
+        if changed == "canonical_pointer":
+            assert pointer_changed
+            assert str(raised.value) == "retry_cleanup_not_allowed"
+            with pipeline.engine.connect() as observer:
+                current_pointer = observer.scalar(select(publications.c.current_version_id))
+                assert current_pointer == target.id.upper()
         assert target.state == "loading" and target.report is None and target.prepared_hash is None
         assert (history, counts) == (
             ({"abandoned": 1} if changed == "attempt" else {"loading": 1}),
