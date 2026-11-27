@@ -32,7 +32,7 @@
 - **Why:** The professor requires Docker for every server used in the laboratory project.
 - **Evidence:** Lab Setup.pdf, page 1, “Cum lucrăm la laborator”; user approval dated 2026-11-06.
 - **Source:** user · confidence high
-- **Confirmed:** 2026-11-26
+- **Confirmed:** 2026-11-27
 
 ## D-003 · CompanyWatch technical stack
 - **Status:** approved
@@ -40,7 +40,7 @@
 - **Rule:** Use React, TypeScript and Vite for the frontend; FastAPI for the backend; MySQL, SQLAlchemy, PyMySQL and Alembic for persistence; Docker Compose for application services. M1 supplies frontend structure and build tooling without visual UI pending D-002.
 - **Why:** Establish the first technical milestone without assuming dataset structure or visual requirements.
 - **Evidence:** User explicitly approved the M1 plan and D-003 on 2026-11-17.
-- **Confirmed:** 2026-11-26
+- **Confirmed:** 2026-11-27
 
 ## D-004 · Docker verification and continuous integration
 - **Status:** approved
@@ -48,7 +48,7 @@
 - **Rule:** Run application verification in Docker, with real MySQL integration tests. Use pytest and HTTPX for backend tests, Ruff for Python checks, TypeScript and ESLint for frontend checks, and GitHub Actions on pull requests and pushes to main. CI checks the ledger, backend tests, frontend build and Compose smoke behaviour. Pin compatible dependencies during implementation.
 - **Why:** Make M1 startup and verification reproducible locally and in CI.
 - **Evidence:** User explicitly approved the M1 plan and D-004 on 2026-11-17.
-- **Confirmed:** 2026-11-26
+- **Confirmed:** 2026-11-27
 
 ## D-005 · CompanyWatch requirements and dataset approval
 - **Status:** approved
@@ -56,7 +56,7 @@
 - **Rule:** Build an ETL + API + Dashboard project using a real public dataset with at least 100,000 rows and two real versions, idempotent ingestion, quality reports, SQL-computed diff, schema-change detection, documented API and interactive dashboard. ONRC is a candidate only until its source, schema and versions are verified. M1 implements technical foundations, not these dataset-dependent features.
 - **Why:** Preserve the professor requirements supplied by the user without inventing dataset or interview evidence.
 - **Evidence:** User supplied the requirements and explicitly approved D-005 and M1 on 2026-11-17.
-- **Confirmed:** 2026-11-26
+- **Confirmed:** 2026-11-27
 
 ## D-002 · Figma approval with versioned local design mocks
 - **Status:** approved
@@ -73,7 +73,7 @@
 - **Rule:** The official OD_FIRME.CSV editions dated 19.10.2026 and 04.11.2026 are approved for M2 development. Preserve source/resource identifiers, URLs, CC BY 4.0 attribution, transfer metadata and SHA-256. Complete source validation remains mandatory before publication. This implementation session may use synthetic fixtures and bounded source investigation only, not full ONRC downloads.
 - **Why:** Two authentic editions were verified without claiming full-file integrity or complete quality.
 - **Evidence:** User explicitly approved D-006 and the M2 build with these conditions.
-- **Confirmed:** 2026-11-26
+- **Confirmed:** 2026-11-27
 
 ## D-007 · ONRC parsing, candidate identity and minimal legal-entity scope
 - **Status:** approved
@@ -81,7 +81,7 @@
 - **Rule:** Use UTF-8 with BOM, separator ^ and literal quote characters as the candidate ONRC profile, validating the full file before publication. EUID is a candidate natural key; missing keys and all rows participating in duplicate keys must not be published automatically. Persist only reliably identified legal entities and minimal identifiers, name, legal form, county, locality and registration date. Detailed addresses and natural-person records are not retained. Unknown classifications fail closed and are reported. Temporary protected local raw files are permitted only during processing, excluded from Git and public output, and removed after processing including failures.
 - **Why:** Sampling found malformed standard CSV quoting, duplicate/missing identifiers and natural-person records.
 - **Evidence:** User explicitly approved D-007 and the M2 scope/data-minimization conditions; classification evidence is documented in ../ONRC-SOURCE.md.
-- **Confirmed:** 2026-11-26
+- **Confirmed:** 2026-11-27
 
 ## D-008 · ETL version lifecycle, SQL diff and atomic publication
 - **Status:** approved
@@ -89,7 +89,7 @@
 - **Rule:** Implement streaming download and SHA-256, strict parsing, validation, staging, reconciled quality reports, idempotent immutable versions, explicit manual approval and transactional atomic publication in MySQL. Compare published versions in SQL using EUID and NULL-safe field comparisons. Preserve existing MySQL data. Initially test only with synthetic fixtures and isolated MySQL databases. Evolve schema-dependent M1 tests as explicitly authorized, preserving baseline history and verifying upgrade data preservation. No commit, push, merge or deploy is authorized.
 - **Why:** Incomplete or unapproved imports must not replace published data; M2 migrations supersede the test assumption that the database contains only the M1 baseline.
 - **Evidence:** User explicitly approved D-008, C-002 and the M2 implementation conditions, including evolution of M1 migration tests.
-- **Confirmed:** 2026-11-26
+- **Confirmed:** 2026-11-27
 
 ## D-009 · Mandatory final project scope
 - **Status:** approved
@@ -97,7 +97,7 @@
 - **Rule:** Deliver the mandatory P28 and general university requirements in [the requirements matrix](../P28-REQUIREMENTS.md). Preserve and reuse M1, M2 and M2.1. Exclude multi-year financial analysis from additional sources, fiscal/TVA checks, automatic notifications and commercial accounting-software integration. Add another dataset only if necessary for a mandatory requirement and explicitly approved.
 - **Why:** The project owner supplied the complete scope and chose to retain the baseline in D-005.
 - **Evidence:** [Section C decision review and scope](../P28-REQUIREMENTS.md#section-c-decision-review).
-- **Confirmed:** 2026-11-26
+- **Confirmed:** 2026-11-27
 
 ## D-010 · Observed company history
 - **Status:** approved

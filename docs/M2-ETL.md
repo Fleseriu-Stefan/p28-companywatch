@@ -214,11 +214,132 @@ calculul amprentei pot genera încă operații mari. Q-013 și Q-014 rămân
 în investigare. Verificarea sintetică la 4.229.451 de rânduri, scalabilitatea
 aprobării și publicării și performanța diff-ului real au verificări separate.
 
-Gate 2 (Q-013) va măsura întârzierea purge-ului InnoDB la curățarea de
+Gate 2 (Q-013) a investigat întârzierile purge-ului InnoDB la curățarea de
 reluare, la finalizarea cu succes, la curățarea după eșec și la verificarea
 finală că staging-ul este gol. Gate 4 va măsura spațiul simultan ocupat de
 staging și rândurile pregătite, spațiul pentru undo și rezerva necesară
 pentru recuperare după întrerupere.
+
+#### Gate 2 A1 — pilot sintetic
+
+Pilotul folosește câte o pereche control/test pentru cele patru scenarii
+de curățare, cu 25.001 rânduri staging în fiecare rulare. Lansatorul
+folosește schema existentă și păstrează loguri JSON agregate pentru
+măsurători, validarea vizibilității, starea finală și teardown. Modul
+`--preflight` verifică configurația și metadatele fără pornirea containerelor.
+Modul `--pilot` necesită aprobarea explicită a executării.
+
+Bugetul operațional de 4 GiB se bazează pe eșantioane, fără cotă fizică.
+Monitorul oprește rularea la 2 GiB observați sau dacă spațiul liber scade
+sub 4 GiB pe discul Docker ori pe discul Windows. Include volumul, straturile
+inscriptibile, logurile, fișierele temporare și creșterea stocării. Scrierile
+dintre eșantioane pot depăși maximul observat. Un eșantion lipsă, invalid
+sau întârziat oprește campania. Monitorul gazdă colectează independent de
+worker la pornire, în timpul rulării și la oprire. Intervalul țintă este de
+5 secunde, cu cel mult 10 secunde între eșantioane valide. Operațiile au
+termene monotone, iar campania rezervă timp pentru oprire și verificarea
+resurselor. MySQL primește doar SIGTERM, are cel mult 125 de secunde
+pentru oprire și trebuie să confirme codul de ieșire 0 dacă a pornit.
+O verificare eșuată a apartenenței resurselor sau a opririi blochează
+curățarea automată ulterioară. Rezultatele păstrează maximul observat.
+
+Workerul este instalat în containerul izolat după verificarea limitelor
+cgroup. Destinația și toate căile din arhivă sunt verificate înaintea
+primei scrieri. Instalarea refuză redirecționarea prin legături simbolice.
+Configurația generată activează `init: true` doar pentru runner. Lansatorul
+verifică `HostConfig.Init` înainte de pornire. Docker init transmite
+SIGTERM procesului idle, iar lansatorul acceptă pentru runner doar codurile
+0 și 143. Pentru MySQL verifică obligatoriu codul 0. Dacă oprirea runnerului
+eșuează după terminarea confirmată a lucrului, lansatorul reverifică
+apartenența înainte de oprirea MySQL. O execuție fără confirmare sau un read
+view fără eliberare confirmată blochează oprirea automată. Resursele se
+elimină numai după o nouă verificare a apartenenței. Pentru un container
+pornit, `docker container inspect` trebuie să confirme starea `exited`
+și același cod ca `docker container wait`. Rezultatele consemnează ambele surse.
+Excepția pentru un container rămas în starea `Created` necesită dovezi
+că nu a pornit și că nu există o pornire neconfirmată. O neconcordanță
+sau o dovadă lipsă blochează eliminarea tuturor resurselor și păstrează
+markerul de blocare.
+
+Comparația loturilor folosește diferența târziu–devreme din condiția cu
+read view păstrat, redusă cu diferența din control. Pentru verificarea
+staging-ului gol se compară direct cele două durate în scenariile de
+finalizare și de eșec. Scenariul retry eliberează read view după curățarea
+de retry. Curățarea finală ulterioară și verificarea terminală se
+înregistrează separat, în afara tratamentului pentru purge.
+Lansatorul validează identitatea rulării, dovezile pentru read view,
+loturile, planurile, măsurătorile SQL și punctele de control InnoDB.
+Respinge rulările invalide și etichetează separat perechile valide
+pentru care condițiile de purge nu pot fi distinse. O recomandare pentru
+cursor cere un efect de minimum 2 ms și minimum 20% în toate cele trei
+perechi primare. A1 are o pereche per scenariu și consemnează doar
+dovezile pilotului, inclusiv rezultatele neconcludente. Contorul SQL
+`ROWS_EXAMINED` nu include întreaga traversare internă InnoDB.
+
+Prima campanie A1 autorizată s-a oprit la pornirea scenariului retry,
+condiția control, în proiectul `companywatch-check-61a1f16583e15c03`.
+Verificarea apartenenței solicita câmpul `.SizeRw` fără opțiunea
+`--size`, iar Docker a respins șablonul. Ambele containere au rămas
+în starea `Created`. Blocajul de curățare a păstrat containerele,
+rețeaua și volumul sintetic. Singurul eșantion, înregistrat înaintea
+rulării, a măsurat 69.632 octeți observați. Nu s-au încărcat date și
+nu există măsurători ale loturilor, ale verificării terminale sau
+ale purge. Prima rulare este invalidă, iar celelalte șapte nu au
+fost încercate. Resursele sintetice au fost eliminate ulterior cu
+aprobare explicită, iar markerul de blocare a fost păstrat.
+Lansatorul solicită acum `.SizeRw` doar la eșantionarea stocării, cu
+`docker container inspect --size`. O valoare lipsă sau invalidă
+oprește campania. O nouă rulare A1 necesită aprobarea rezolvării
+markerului și aprobarea executării. A2 rămâne în așteptarea unui pilot valid.
+[Jurnalul execuției](../AI_LOG.md#2026-11-27--m23c-gate-2-a1-pilot-stopped-during-startup)
+
+După rezolvarea aprobată a markerului istoric, noul pilot A1 a măsurat
+doar scenariul retry în condiția control, cu 25.001 rânduri staging și
+24.251 rânduri pregătite. Workerul a terminat măsurătorile, dar containerul
+runner a rămas activ după SIGTERM și după expirarea termenului de oprire.
+Lansatorul a blocat curățarea înainte să trimită SIGTERM către MySQL.
+Ambele containere și resursele proiectului au fost păstrate. Rularea
+este invalidă din cauza opririi incomplete, iar celelalte șapte rulări
+nu au început. Rezultatele parțiale sunt păstrate pentru diagnostic.
+Aprobările separate au permis oprirea MySQL cu cod 0, oprirea runnerului
+cu cod 137 și eliminarea resurselor sintetice. Markerul de blocare a rămas
+în dosarul de probe. Testul de ciclu de viață propus verifică un singur
+proiect sintetic cu `SELECT 1` în regim read-only, oprirea și eliminarea
+resurselor. Nu rulează benchmarkul ETL și nu încarcă cele 25.001 rânduri.
+A2 rămâne în așteptare.
+[Jurnalul rulării](../AI_LOG.md#2026-11-27--m23c-gate-2-a1-fresh-pilot-stopped-during-teardown)
+
+Testul minimal de ciclu de viață a trecut în proiectul sintetic
+`companywatch-check-3e9c828fa011f8ab`. Lansatorul a verificat `init` și
+limitele cgroup, MySQL a devenit disponibil, iar runnerul a executat
+`SELECT 1` într-o tranzacție read-only. Monitorul independent a colectat
+patru eșantioane, cu un interval maxim de 5,339 secunde. Oprirea a folosit
+SIGTERM, iar `docker container wait` și `docker container inspect` au
+confirmat codurile 143 pentru runner și 0 pentru MySQL înainte de eliminare.
+Resursele sintetice au fost eliminate complet și etichetele de apartenență
+ale volumelor protejate au rămas neschimbate. Testul nu a rulat benchmarkul
+ETL și nu a încărcat cele 25.001 rânduri.
+[Probele testului](../AI_LOG.md#2026-11-27--m23c-gate-2-a1-minimal-lifecycle-smoke-passed)
+
+Campania sintetică A1 ulterioară a finalizat toate cele opt rulări cu
+25.001 de rânduri staging per rulare. Cele patru read view-uri au trecut
+verificările de vizibilitate și eliberare, dar toate cele patru comparații
+privind purge au rămas neconcludente conform criteriilor aprobate. În
+condiția cu read view, tranzacția până la care a avansat purge a crescut
+după eliberare, iar lungimea listei de istoric observate nu a scăzut sub
+valoarea dinaintea eliberării în fereastra de observație. Timpii sunt
+descriptivi. Verificarea terminală din retry a rămas în afara comparației.
+Toate cele opt proiecte au confirmat codurile de ieșire 143 pentru runner
+și 0 pentru MySQL înainte de eliminare. Resursele sintetice au fost
+eliminate, iar etichetele volumelor protejate au rămas neschimbate.
+Proprietarul a aprobat amânarea A2 și Stage B și păstrarea curățării
+existente. Validarea performanței Gate 2 rămâne incompletă. Q-013 poate fi
+reluată dacă latența curățării sau timpul de deținere a lock-ului pe pointer
+devine un blocaj măsurabil ori dacă atribuirea efectului purge este necesară
+pentru o viitoare decizie de ingestie. Îmbunătățirile protocolului rămân
+propuneri. Gate 3 (Q-014) poate fi investigată separat după aprobare.
+[Checkpoint Gate 2 și protocolul propus](M2.3C-GATE-2-CHECKPOINT.md)
+· [Probe sintetice sanitizate](evidence/m2-3c-gate2-a1.json)
 
 ## Aprobare, publicare și diff
 
