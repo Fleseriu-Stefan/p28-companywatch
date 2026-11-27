@@ -1,5 +1,525 @@
 # AI log
 
+## 2026-11-27 · M2.3C Gate 2 checkpoint and owner deferral
+
+The owner accepted eight valid A1 trials, four inconclusive purge
+comparisons, the successful lifecycle smoke test, 46 passing offline
+tests, and complete disposable-resource cleanup. The owner explicitly
+deferred A2 and Stage B. Production keeps the existing bounded cleanup.
+Gate 2 performance validation remains incomplete. Q-005, Q-013 and Q-014
+remain investigating, and PATTERN-003 remains candidate-only.
+
+Revisit Q-013 if batch latency or publication-pointer hold time becomes
+a measured bottleneck, or if purge attribution is needed for a separately
+approved ingestion decision. The proposed matched sampling schedule,
+commit and release timestamps, and active read-view measurements remain
+unimplemented. The purge-differentiation criteria and materiality
+thresholds are unchanged. Gate 3 can be investigated independently
+after separate approval, subject to C-002. It was not started.
+
+The [checkpoint](docs/M2.3C-GATE-2-CHECKPOINT.md) records the planning
+decision and offline reproduction. The [sanitized evidence](docs/evidence/m2-3c-gate2-a1.json)
+reproduces the original classifications and preserves the eight trial
+measurements and smoke outcome in the repository.
+
+## 2026-11-27 · M2.3C Gate 2 full A1 synthetic pilot
+
+The owner authorized one fresh A1 campaign. The reviewed Python checksums,
+approved nine-file scope, empty index, historical evidence, and live main
+at `4af5a6fcbcd093a4ad74492c66fd3ec8030e56e0` matched. No unresolved
+cleanup block or active isolated verification project remained. Read-only
+Docker preflight passed. The exact command ran once and exited 0:
+
+```sh
+env -u PYTHONOPTIMIZE python3 -B -m scripts.etl_purge_pilot --pilot
+```
+
+All eight trials passed workload validation and teardown. The projects,
+listed as control and held, were retry `c8841299cde86c1a` and
+`d57d78a0fa84eab4`, finalization `2a4262fd54e72a45` and
+`9d78cb84a75d50f2`, failure before copy `5dd5ee155b76f5a5` and
+`9591debe5d52ff96`, and failure after copy `28a4dfe3979756a6` and
+`df567d8c842efe02`, all with the `companywatch-check-` prefix.
+Every trial used 25,001 target staging rows. Prepared rows were 24,251
+except in the failure-before-copy fixtures, where there were zero.
+The recorded drains reconciled to 347,014 deletions, including the
+second staging drain in each retry trial. Every held read view passed its
+visibility and release checks. Every control opened no held read view.
+
+All four purge comparisons were inconclusive under the approved criteria.
+Held history list length exceeded control before release in retry and
+failure after copy and equaled control in finalization and failure before
+copy. The purge transaction watermark advanced after each held release,
+but sampled history list length remained at or above its pre-release value
+during the observation window. Descriptively, excess late-minus-early
+batch selection was 2.896 ms for retry staging, 3.854 ms for retry prepared,
+3.436 ms for successful finalization, 2.972 ms for failure-before-copy
+staging, and 3.294 and 3.768 ms for staging and prepared rows in failure
+after copy. Held-versus-control terminal staging probe excesses were
+5.644, 5.845 and 5.735 ms respectively for finalization and the two failure
+scenarios. The retry terminal probe was outside the treatment and excluded.
+Plans used the staging version-key index and the prepared primary key.
+SQL rows examined and sampled handler counters are recorded separately
+from physical InnoDB traversal, which was not measured.
+
+The 50 watchdog samples had a maximum within-trial gap of 5.400 seconds.
+Peak observed storage was 472,170,496 bytes, MySQL memory 761,716,736 bytes,
+and runner memory 126,554,112 bytes. Minimum observed free space was
+1,017,840,828,416 bytes on Docker and 823,416,164,352 bytes on Windows.
+The evidence span from first project setup through the final trial result
+was 235.502 seconds. In every project, Docker wait and ordinary inspect
+agreed before removal on runner exit 143 and MySQL exit 0. Independent
+post-run metadata checks found no disposable project resources or
+references. Both protected volume ownership labels matched preflight.
+
+The complete per-trial report, including batch windows, terminal and
+publication pointer timings, observer overhead and scan counters, is at
+`/tmp/companywatch-a1-48bz8v1n-report.md`. Raw reports and the batch
+comparison summary are in `/tmp/companywatch-purge-a1-48bz8v1n`.
+Both historical failed-pilot reports and the lifecycle smoke evidence were
+preserved. The reviewed Python files and experimental thresholds were
+unchanged. A2 should first strengthen treatment verification by recording
+active read views and purge progress at equivalent post-release checkpoints.
+This single pilot pair per scenario does not justify a seek cursor. A2,
+Stage B and real-data validation were not started. Q-005, Q-013 and Q-014
+remain investigating, and PATTERN-003 remains candidate-only.
+
+## 2026-11-27 · M2.3C Gate 2 A1 minimal lifecycle smoke passed
+
+The one approved lifecycle smoke command ran once from the repository
+root and exited 0:
+
+```sh
+env -u PYTHONOPTIMIZE PYTHONPATH=. python3 -B /tmp/companywatch-a1-lifecycle-smoke.py
+```
+
+Project `companywatch-check-3e9c828fa011f8ab` passed the shared launcher
+checks for effective runner init, MySQL's 2-vCPU quota, MySQL's 2 GiB
+memory limit and the runner's 1 GiB limit, with swap disabled for both.
+MySQL became healthy. The runner finished a read-only transaction with
+`SELECT 1` equal to 1 and released its connection. The synthetic schema
+was initialized. The ETL benchmark and the 25,001-row fixture did not run.
+
+The independent watchdog recorded four samples with a maximum gap of
+5.339 seconds and no monitor failure. Observed peaks were 219,811,840 bytes
+of storage, 590,065,664 bytes of MySQL memory and 28,061,696 bytes of runner
+memory. The exact readings, CPU and I/O counters and shutdown evidence are in
+`/tmp/companywatch-purge-a1-k0jkdbm1/companywatch-check-3e9c828fa011f8ab.lifecycle.json`.
+
+Docker events recorded only SIGTERM for each container. Signal-to-exit
+time was 170.952 ms for runner
+`e67c855bffec7afef88c035d98ab9ce04a17c100403989c48000ce8eb66b89c2`
+and 972.983 ms for MySQL
+`084ff7e18379f05471f00b676ccf5c2cbf9ded0334e58a3eed0159e4d51e8186`.
+Before removal, Docker wait and ordinary inspect agreed on runner exit 143
+and MySQL exit 0, both exited. Events confirmed that both exits preceded
+the first container removal. Read-only post-checks found no project
+containers, network, volume, images or disposable volume references.
+Both protected volume ownership label sets matched the expected preflight
+values. No cleanup block remained.
+
+Both historical failed-pilot reports were preserved. This verifies only
+the minimal lifecycle. The full A1 pilot, A2 and Stage B were not run.
+Q-005, Q-013 and Q-014 remain investigating, and PATTERN-003 remains
+candidate-only.
+
+## 2026-11-27 · M2.3C Gate 2 A1 second cleanup marker resolution
+
+The owner explicitly approved resolving the marker for
+`companywatch-check-3ee798bc53e5d107` and running one minimal lifecycle smoke
+test subject to verification. All four reviewed Python checksums and the
+baseline matched. The smoke script differs from the reviewed predecessor
+only by its `shutdown` evidence field.
+
+Read-only Docker inventory verified that the recovered project had no
+remaining labelled resources, exact container IDs, network, volume or
+volume references. The historical result JSON and Compose override matched
+their original hashes. Only the approved marker was renamed in place to
+`.cleanup-resolved`, without overwriting a destination. Its SHA-256 remained
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+No unresolved marker remained. Read-only preflight passed with runner init
+and the declared Compose limits verified, without creating resources.
+
+## 2026-11-27 · M2.3C Gate 2 A1 independent exit verification
+
+The owner approved a test-first correction in the shared launcher after the
+smoke review found that the second ownership check read Docker inspect state
+but did not compare its exit code with Docker wait. Eight new offline tests
+produced ten behavioral failures or subtest failures and two baseline
+passes. The old launcher allowed removal after mismatched wait and inspect
+codes, missing or invalid inspect codes, a started container reported as
+`Created`, or a missing container in the final ownership snapshot.
+Matching exits and the verified never-started case already passed.
+
+The launcher now binds ordinary Docker inspect to the requested container
+ID and requires the same container, network and volume identities across
+shutdown checks. Before any removal it verifies the independently inspected
+status and exit code against Docker wait for each started container. MySQL
+must exit 0 and the runner must exit 0 or 143. The never-started exception
+requires matching zero start and finish timestamps, no live PID, and no
+acknowledged or pending start. Failure or missing evidence latches cleanup
+and prevents removal. Both sources are recorded in the pilot and proposed
+smoke evidence. The smoke script changed only to expose that evidence.
+
+All 46 offline tests passed. Three existing fixtures were extended to
+model the new evidence, and all 38 original test assertions were preserved.
+Ruff lint and format, ledger lint, git diff --check and read-only preflight
+passed. The startup-to-removal review checked identity and scope, live limit
+checks, workload acknowledgments, the read-view guard, wait and inspect,
+and the pre-removal ownership recheck. Live execution remains pending.
+The current cleanup marker and both failed-pilot evidence sets were preserved.
+No containers were created or started. A2, Stage B and all ledger statuses
+remain unchanged. The smoke test awaits explicit approval.
+
+## 2026-11-27 · M2.3C Gate 2 A1 runner lifecycle correction
+
+The owner approved a test-first correction after recovery of the second
+disposable project. The eight new offline tests produced seven behavioral
+failures and one baseline pass. The previous launcher omitted runner init
+from the generated override and did not enforce the effective HostConfig
+setting. A runner timeout skipped MySQL shutdown and the ownership recheck.
+The launcher accepted runner exit 137 and attempted shutdown when a Docker
+exec acknowledgment or a read-view release was missing. Runner exits 0 and
+143 already passed.
+
+Only the generated override for the disposable runner now enables init.
+Read-only preflight verifies the rendered setting, and the launcher checks
+effective HostConfig.Init before starting the containers. The launcher sends
+SIGTERM only and accepts runner exit 0 or 143, with MySQL still requiring
+exit 0. After an idle runner shutdown failure it reproves ownership before
+attempting MySQL shutdown. A lost workload acknowledgment or an unreleased
+read view blocks automatic shutdown. Failure to prove ownership or shutdown
+preserves the cleanup marker and denies resource removal. Existing deadlines,
+monitoring and resource budgets are unchanged.
+
+All 38 offline tests passed. One existing test fixture gained the expected
+HostConfig.Init value, and all 30 original test assertions were preserved.
+Ruff lint and format, ledger lint, git diff --check and read-only preflight
+passed. Runtime behavior remains unverified. The proposed lifecycle smoke
+uses one disposable project, the same launcher startup, watchdog and
+teardown, and a read-only SELECT 1 from the runner. It uses normal synthetic
+schema setup and does not run the ETL benchmark or insert the fixture.
+The proposal was syntax-checked only and awaits separate marker resolution
+and execution approval.
+
+Both failed-pilot reports and their evidence remain intact. The second
+cleanup-block marker is unchanged. No containers were created or started.
+A2 and Stage B remain pending. Q-005, Q-013 and Q-014 remain investigating,
+and PATTERN-003 remains candidate-only.
+
+## 2026-11-27 · M2.3C Gate 2 A1 recovery step 3
+
+The owner approved removal of only the two containers, network and volume
+of `companywatch-check-3ee798bc53e5d107`. Assertion-enabled read-only
+checks immediately before removal confirmed the original ownership,
+expected mounts and unchanged finish timestamps. MySQL was `exited 0`
+and the runner `exited 137`. Neither mounted a protected volume. The
+disposable volume had only the verified MySQL reference, and the disposable
+network had no endpoints. The three evidence hashes matched.
+
+All four approved removals succeeded in order, with each local Docker CLI
+call bounded to five seconds:
+
+```sh
+timeout --kill-after=1s 4s docker container rm 5cc6d156a3a5c08c0d2a7d8065cfb7bcd060863631da9663d59b347506972d7f &&
+timeout --kill-after=1s 4s docker container rm cf1b921df5f7ac27f2569446c6996ce7df5e5a6e630fd7f8d080a29e9a167df0 &&
+timeout --kill-after=1s 4s docker network rm 90235359e07a332109ee1ea71580050b9e71c799ef2ea7d22180f57bf6513fdc &&
+timeout --kill-after=1s 4s docker volume rm companywatch-check-3ee798bc53e5d107_mysql_data
+```
+
+Post-removal checks found neither exact container ID, network or volume
+and no project-labelled resources. Both protected volume label sets and
+the five unrelated containers' metadata matched the pre-removal snapshot.
+The result JSON, Compose override and cleanup-block marker retain their
+original hashes. The marker remains in place. No containers were started
+and the pilot was not retried. The trial remains invalid. The runner
+lifecycle correction awaits explicit owner approval.
+
+## 2026-11-27 · M2.3C Gate 2 A1 recovery step 2
+
+The owner approved stopping only the idle disposable runner
+`5cc6d156a3a5c08c0d2a7d8065cfb7bcd060863631da9663d59b347506972d7f`
+in project `companywatch-check-3ee798bc53e5d107`. Assertion-enabled checks
+immediately before signaling verified its exact ownership labels, the
+read-only scripts mount, absence of protected mounts, and `sleep infinity`
+as its sole process. No benchmark worker remained. MySQL was still
+`exited 0` with its original finish time, and the evidence hashes matched.
+
+The bounded shutdown chain sent SIGKILL only to the runner. Docker wait
+returned `137` and ordinary Docker inspect confirmed `exited 137`, with
+finish time `2026-11-27T17:23:40.629316991Z`. The time from the signal
+command to confirmation was 251 ms. MySQL received no further signal
+and remained `exited 0`. No containers, network or volume were removed.
+The result JSON, Compose override and cleanup-block marker were
+preserved. Recovery step 3 awaits explicit owner approval. The trial
+remains invalid.
+
+## 2026-11-27 · M2.3C Gate 2 A1 recovery step 1
+
+The owner approved graceful shutdown of only the disposable MySQL container
+`cf1b921df5f7ac27f2569446c6996ce7df5e5a6e630fd7f8d080a29e9a167df0`
+in `companywatch-check-3ee798bc53e5d107`. Assertion-enabled checks
+immediately before shutdown verified the exact project and service labels,
+exclusive disposable volume ownership, expected mounts, and network endpoints.
+Neither container mounted a protected volume. The runner contained only
+`sleep infinity`, and MySQL reported zero client sessions, active InnoDB
+transactions, and open read views. The evidence hashes matched.
+
+The bounded Docker command sent SIGTERM to MySQL. The local Docker wait
+returned `0` and ordinary Docker inspect reported `exited 0`, with finish
+time `2026-11-27T17:19:22.339808007Z`. The observed time from signal command
+to final confirmation was 1.470 seconds. No other signal was sent to MySQL.
+The runner was not signaled and remained running on post-check. No
+containers, network or volume were removed. The original result JSON,
+Compose override and cleanup-block marker retain their hashes. Recovery
+step 2 awaits explicit owner approval. The original trial remains invalid.
+
+## 2026-11-27 · M2.3C Gate 2 A1 fresh pilot stopped during teardown
+
+After resolving the historical marker with owner approval, the reviewed
+checksums and read-only preflight passed. The exact approved pilot command
+ran once. The new campaign stopped on the first trial, retry cleanup under
+control in `companywatch-check-3ee798bc53e5d107`, with exit code 1 and
+`docker operation deadline reached`. The seven remaining trials were not
+attempted.
+
+The worker report independently passed structural and data-protection
+validation. It recorded 25,001 target staging rows and 24,251 prepared
+rows, deleting 25,001 in retry staging, 24,251 in retry prepared and
+25,001 in later finalization staging. The workload took 3.029 seconds,
+including 79.6 ms of recorded observer overhead. The control opened no
+held read view. Its InnoDB history list length started at 28, peaked at
+60, and fell to 16 at the retry release checkpoint while purge advanced
+from transaction 1897 to 2053. There was no held-view trial or paired
+comparison. The retry terminal staging probe took 0.157 ms client-side,
+0.068 ms server-side, and returned zero rows. It was outside the
+held-view treatment. Raw batch timings, execution plans, handler
+counters, terminal timings and resource readings are in
+`/tmp/companywatch-purge-a1-r2lnvgh7/companywatch-check-3ee798bc53e5d107.result.json`.
+
+Seven resource readings showed a maximum gap of 5.362 seconds. Peak
+observed storage was 296,300,544 bytes. Peak MySQL and runner memory
+were 762,089,472 and 126,697,472 bytes respectively. The trial ran for
+34.775 seconds including setup and the failed teardown. Docker events
+showed SIGTERM sent to the runner, whose command was `sleep infinity`.
+It remained running after the 15-second runner wait. The guard stopped
+before signaling MySQL and persisted the new cleanup-block marker.
+Read-only inventory confirmed both containers still running, with the
+disposable network and volume retained. MySQL exit 0 was not obtained.
+The campaign marks the trial invalid due to teardown failure even though
+the worker measurements were recorded. No resources were removed after
+the failure, and the pilot was not retried.
+
+The reviewed Python checksums and original campaign evidence still match.
+A1 remains incomplete and A2 is pending. No cursor recommendation can be
+made. Q-005, Q-013 and Q-014 remain investigating, and PATTERN-003 remains
+candidate-only.
+
+## 2026-11-27 · M2.3C Gate 2 A1 cleanup marker resolution
+
+The owner explicitly authorized archiving the cleanup marker for the recovered
+project `companywatch-check-61a1f16583e15c03` and running one fresh A1 pilot
+after preflight. The reviewed Python checksums and baseline matched. Read-only
+Docker inventory reconfirmed the exact container IDs, network and volume were
+absent, with no remaining project labels or references to the disposable volume.
+The historical result JSON and Compose override matched their recorded hashes.
+The marker was renamed from `.cleanup-blocked` to `.cleanup-resolved` in the
+original evidence directory without overwriting a destination. Its SHA-256
+remained `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+No other cleanup marker was changed. No unresolved marker remained before preflight.
+
+## 2026-11-27 · M2.3C Gate 2 A1 Docker SizeRw regression fix
+
+The owner approved a test-first correction limited to Docker inspection in
+the pilot launcher. Before changing it, four offline regressions produced
+two passes and two errors. The ordinary inspection fixture omitted
+`.SizeRw`, matching Docker's observed response. The ordinary ownership
+test and the wrong-volume-owner test both stopped at the same template
+error, before the actual volume ownership check. The size request and
+invalid-measurement tests already passed.
+
+The launcher now requests `.SizeRw` only with `docker container inspect
+--size` on the storage sampling path. Ordinary ownership checks use the
+same metadata fields apart from that size field. Absent, null, negative
+or invalid values still abort sampling before a sample can be recorded.
+The wrong-volume-owner regression now reaches the intended check,
+persists the cleanup block and prevents automated removal.
+
+All 30 offline tests passed, including the 26 original tests with their
+assertions intact. Ruff lint and format, ledger lint, git diff --check and
+read-only preflight passed. The other ownership fields were checked
+against offline Docker fixtures and the original recovery evidence. The
+installed CLI help confirmed the inspect and inventory options used.
+Preflight verified the protected volume labels by metadata only. No
+containers were created or started. The failed-pilot result JSON, Compose
+override and cleanup-block marker retain their original hashes. A1 awaits
+explicit marker resolution and a fresh pilot approval. Q-005, Q-013 and
+Q-014 remain investigating, and PATTERN-003 remains candidate-only.
+
+## 2026-11-27 · M2.3C Gate 2 A1 disposable project recovery
+
+After the read-only recovery assessment, the owner approved removing only the
+four resources of `companywatch-check-61a1f16583e15c03`. Immediately before
+removal, ordinary Docker metadata checks ran with Python assertions enabled.
+Both containers were still `Created`, with zero start and finish timestamps,
+PID 0, restart count 0, and restart policy `no`. The labels and mounts matched
+the original trial. Only the disposable MySQL container referenced the
+disposable volume, and the disposable network had no endpoints. Graceful
+shutdown was inapplicable because neither container had started.
+
+All four approved commands succeeded in order:
+
+```sh
+docker container rm f3d754390cd0bb3a8e4b31867d53dd45ffe53a49a01f2e8b832ae9c1fc1fc334 &&
+docker container rm cd22a6d1d7180016a1a683de231396db200d8668e6ba18753a3858c729691acd &&
+docker network rm c44175713c8dbaa0658b63e979e45d5a26dfea9dc90bb7228e52860bfb6932b0 &&
+docker volume rm companywatch-check-61a1f16583e15c03_mysql_data
+```
+
+Post-removal assertions verified that both exact container IDs, the network,
+the volume, and all project-labelled resources were absent. The metadata
+snapshots of the five other containers and both protected volume label sets
+matched before and after. The original result JSON, Compose override and
+cleanup-block marker matched their earlier SHA-256 digests. The marker remains
+in place. No containers were started and the pilot was not rerun. The
+`.SizeRw` regression fix awaits owner approval.
+
+## 2026-11-27 · M2.3C Gate 2 A1 pilot stopped during startup
+
+The owner authorized one eight-trial synthetic campaign. The three reviewed
+Python checksums, nine-file inventory, empty index, live main baseline
+`4af5a6fcbcd093a4ad74492c66fd3ec8030e56e0`, and absence of a prior cleanup
+block were verified. Read-only preflight passed and verified both protected
+volume ownership labels. The approved `--pilot` command was executed once.
+
+The first trial, retry cleanup under the control condition, stopped during
+startup of `companywatch-check-61a1f16583e15c03` with exit code 1.
+Read-only reproduction against both retained containers showed that the
+ownership inspection template requested `.SizeRw` without `--size`.
+Docker returned `map has no entry for key "SizeRw"`. The ownership check
+latched automatic cleanup. Both containers were still in `Created` state
+with zero start timestamps. The disposable network had no attached
+containers. The two containers, network, volume and cleanup-block marker
+were retained. MySQL was never started, so there was no shutdown exit code.
+Only disposable resource metadata was inspected after the failure.
+
+The only resource sample was taken before the workload and recorded
+69,632 bytes of observed storage, including backing-filesystem growth and
+temporary artifacts. No target rows were staged or deleted. No effective
+live cgroup values, read-view handshakes, plans, batch or terminal timings,
+pointer lock durations, or purge comparisons were measured. The first trial
+is invalid due to startup failure. The seven remaining trials were not
+attempted, and there are no valid or inconclusive matched pairs.
+
+Evidence is in
+`/tmp/companywatch-purge-a1-4kft8ki9/companywatch-check-61a1f16583e15c03.result.json`.
+The reviewed Python files and thresholds were unchanged. The campaign was
+not retried. A2 remains pending a valid A1 pilot. Any change to the runner
+or action on the retained resources requires separate owner approval.
+Q-005, Q-013 and Q-014 remain investigating. PATTERN-003 remains candidate-only.
+
+## 2026-11-27 · M2.3C Gate 2 A1 audit remediation
+
+The owner approved five corrections before pilot execution. Six behavioral
+regressions ran against the audited runner before any implementation changes.
+The 16 existing tests passed. The new tests exposed 15 failures or subtest
+failures: a startup command completed through a storage breach and a
+stalled sample, the wait path entered an unbounded subprocess context exit,
+the retry summary compared an untreated terminal probe, eight malformed
+reports passed validation, and copying was attempted through three simulated
+redirected destinations. These failures exercised the existing behavior.
+
+The host watchdog now samples independently across startup, workload and
+teardown. It distinguishes resources awaiting creation or approved removal
+from missing observations, cancels work on resource and deadline breaches,
+and reserves six minutes of the campaign for shutdown and verified cleanup.
+The launcher bounds local CLI termination and reaping. MySQL shutdown still
+uses SIGTERM with a 125-second limit and requires verified exit 0 before
+removal after startup. A monitor alarm during shutdown invalidates the trial
+while shutdown remains bounded. Failed ownership or shutdown proof latches
+automatic teardown.
+
+The retry drain measurements are preserved. Its later finalization and
+terminal staging probe are recorded outside the held-view treatment and
+excluded from treatment comparisons. Host validation checks trial identity,
+expected fixture counts and drain totals, server timings, plan keys, InnoDB
+history checkpoints, and terminal treatment and row results. Invalid trials
+stop the campaign. Valid comparisons with no distinguishable purge conditions
+are labelled inconclusive. A1 cannot recommend a cursor.
+
+The worker archive is installed under /app as the runner user. The installer
+checks all destination paths before writing, opens directories with no-follow
+descriptors, and replaces regular files within the verified directories.
+After remediation, 26 offline tests passed with all original assertions
+intact. Ruff lint and format, ledger lint and git diff --check passed.
+The read-only Docker preflight passed after retrying with Docker metadata
+access and verified both protected volume labels, the cached images,
+cgroup v2, the declared Compose resource limits, and free storage above
+10 GiB on both backing filesystems. It created no resources.
+
+Live cgroup enforcement, monitoring under the benchmark workload, MySQL
+shutdown, and purge results remain unverified. No containers were started
+and no pilot was executed. The work remains unstaged and awaits pilot
+execution approval. Q-005, Q-013 and Q-014 remain investigating, PATTERN-003
+remains candidate-only, and the approved ledger confirmations are preserved.
+[A1 protocol](docs/M2-ETL.md#gate-2-a1--pilot-sintetic)
+
+## 2026-11-27 · M2.3C Gate 2 A1 monitored-budget checkpoint
+
+The owner approved replacing the physical quota requirement with a monitored
+4 GiB operational budget and an early abort at 2 GiB. The earlier preflight
+record and accepted ledger confirmations are preserved. Observations are
+sampled and can miss peaks between readings. The launcher retains the
+existing disposable volume and mount configuration.
+
+The validity tests were written before the launcher. The first offline run
+failed at import because the launcher did not exist. The archive-scope test
+subsequently failed against the missing archive helper before that helper
+was added. The final offline suite passed 16 tests, covering storage and
+free-space thresholds, unreliable sampling, sustained memory pressure,
+deadlines, snapshot handshake, row reconciliation, materiality, ownership,
+and fail-closed abort and cleanup. Ruff lint and format and ledger lint
+passed. Existing regressions and the repository verifier were kept intact.
+
+The launcher has separate read-only preflight and pilot modes. The preflight
+checked cgroup v2 support, cached image identities, protected volume labels,
+free space on the Docker and Windows backing stores, and the rendered
+Compose limits. Effective live container limits and live resource
+measurements are pending. The pilot is fixed at eight 25,001-row trials.
+No containers were created or started, and no trial measurements exist.
+A1 is waiting for explicit pilot execution approval. A2 and Stage B
+remain pending.
+[Gate 2 A1 protocol](docs/M2-ETL.md#gate-2-a1--pilot-sintetic)
+
+## 2026-11-27 · M2.3C Gate 2 A1 preflight
+
+The owner approved Stage A in two checkpoints. A1 covers test-only
+instrumentation, safety validation, and eight 25,001-row pilot trials.
+A2 requires review of the pilot evidence. Stage B remains pending.
+Local and live remote main matched
+`4af5a6fcbcd093a4ad74492c66fd3ec8030e56e0`. The worktree was clean
+before creating `test/m2-3c-purge-lag`.
+
+Read-only preflight found Docker Desktop with cgroup v2, CPU quota and
+memory limit support, and an overlayfs/containerd snapshotter. The Docker
+backing filesystem reported 994,274,536 KiB free, above the 10 GiB
+preflight floor. The approved local named-volume layout has no verified
+per-project hard quota on that ext4 backing store. Docker's container
+writable-layer size option does not cap named volume data. Polling usage
+would permit writes between samples and would not enforce the approved
+4 GiB maximum. A separately bounded filesystem would change the
+disposable-volume setup and needs its own reviewed ownership and teardown
+checks.
+
+Stopped at the resource preflight. No runner or tests were added, no
+containers were started, and no pilot measurements exist. No protected
+database or volume contents were accessed. The owner confirmations are
+recorded with the 2026-11-27 date. Q-005, Q-013 and Q-014 remain
+investigating, PATTERN-001 through PATTERN-003 remain candidates, and
+Q-010 confirms the approved real benchmark protocol only.
+[Docker writable-layer limit](https://docs.docker.com/reference/cli/docker/container/run/#storage-opt)
+· [Docker volume behavior](https://docs.docker.com/engine/storage/volumes/#how-mounting-block-devices-works)
+
 ## 2026-11-27 · PR #8 Section G remediation
 
 The owner accepted all three specialist passes for PR #8 at
