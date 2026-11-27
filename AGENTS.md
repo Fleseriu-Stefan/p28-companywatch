@@ -26,6 +26,16 @@ report synchronization as unavailable; do not create a remote implicitly.
 `/plan`. The approved plan runs with `/build`. Small fixes go straight to build, with
 tests first where tests exist.
 
+**Delivery mode through December 3, 2026 (D-017):** Each plan is size S or M
+and covers one delivery unit. Multi-gate campaigns are out of scope. Through the
+end of December 3 in Europe/Bucharest, the project owner pre-authorizes commits
+and pushes on feature branches, opening PRs, merging after CI is green for the
+current PR revision, full download and ingestion of the two D-006 editions
+(19.10.2026 and 04.11.2026), and deployment to the owner's Oracle VM. D-017 takes
+precedence over conflicting authorization rules for these actions. Per-action
+authorization resumes December 4. Preserve existing database data and follow
+the raw-data, validation, and manual publication rules in D-007, D-008 and C-002.
+
 ### The gate
 Ask yourself: **does this change something already approved?**
 - **Do, then report:** add a `candidate` pattern; add or answer an open question
@@ -63,7 +73,9 @@ without new evidence. A rejected proposal is added there with the reason.
   User-authorized M2 exception: real ONRC raw files may exist only temporarily in
   the protected ETL tmpfs, never in Git/logs/public artifacts. Persist only the
   minimal verified legal-entity projection (D-007); remove raw data after processing.
-- Never push, tag, release, or deploy without the user's go for that action.
+- Obtain user authorization before committing, pushing, opening a PR, merging,
+  tagging, releasing, or deploying. Use standing authorization under D-017
+  within its stated scope and dates.
 - When you cite past work, label the intent: **replicate** (only for an `approved`
   pattern) or **for awareness only**. History is not a template.
 - The code wins over any document. When they disagree, say so and fix the document.
@@ -88,9 +100,9 @@ without new evidence. A rejected proposal is added there with the reason.
 ## 1. What this repo is
 p28-companywatch is a Tehnologii Web II ETL + API + Dashboard project.
 M1 provides Docker infrastructure, health API and frontend tooling without visual UI.
-M2 implements the ETL lifecycle, minimal legal-entity snapshots and SQL diff, tested
-only on synthetic data. Two ONRC development sources are approved (D-006), but no
-full real import or real publication has occurred. See `docs/CHECKPOINT.md`.
+M2 implements the ETL lifecycle, minimal legal-entity snapshots and SQL diff.
+Two ONRC development editions are approved (D-006). A full real import and
+publication are pending. See `docs/CHECKPOINT.md` and Q-005.
 
 ## 2. Stack and commands
 Approved stack: React + TypeScript + Vite, FastAPI, MySQL, SQLAlchemy, PyMySQL,
@@ -115,8 +127,9 @@ an isolated project; never run the integration suite on the development database
 The legacy `companywatch` project owns `companywatch_mysql_data`. Run M2 on a
 separately named project and volume. The migration service requires an explicit
 opt-in and refuses the legacy project.
-Frontend command runs ESLint, TypeScript and Vite build. No UI or screenshot
-tooling is approved yet. Verification results: `docs/M1-VERIFICATION.md` and
+Frontend command runs ESLint, TypeScript and Vite build. Q-004 records the
+approved Draft 1 design and screenshot references. Verification results:
+`docs/M1-VERIFICATION.md` and
 `docs/M2-VERIFICATION.md`. `docker compose run --rm --no-deps etl sources` lists
 the approved resources without downloading them. See `docs/M2-ETL.md` for the CLI.
 
@@ -125,10 +138,10 @@ the approved resources without downloading them. See `docs/M2-ETL.md` for the CL
 - `frontend/`: React/TypeScript/Vite build tooling, no visual UI.
 - `compose.yaml`: db, migrate, api and optional tests/frontend tools.
 - `scripts/verify.py`: isolated Docker verification shared with CI.
-- `.github/workflows/ci.yml`: verification on pull requests and pushes to main.
+- `.github/workflows/ci.yml`: verification on every push and on pull requests (D-016).
 - `README.md`: installation, running, verification and troubleshooting.
 - `docs/agents/`: knowledge ledger, architecture, human guide and Codex compatibility.
-- `docs/design/`: design guardrails, empty registry, future mocks and screenshots.
+- `docs/design/`: design guardrails, approved mocks, registry and reference screenshots.
 - `.claude/skills/`: original Graffino plan and build workflows.
 - `.claude/agents/`: original planner and builder definitions.
 - `.agents/skills/`: optional Codex adapters; consult CODEX.md for availability.
@@ -139,10 +152,11 @@ the approved resources without downloading them. See `docs/M2-ETL.md` for the CL
 - Follow D-002 and `docs/design/DESIGN.md` for Figma approval and versioned local mocks.
 - M1 implementation and D-003–D-005/C-001 were explicitly approved on 2026-11-17.
 - M2 synthetic implementation, D-006–D-008/C-002 and evolution of M1 migration
-  tests were explicitly approved. Existing MySQL data must remain untouched in
-  this build; no full ONRC download is authorized yet.
-- Full real validation/publication remains Q-005; UI implementation remains Q-004.
-- This setup authorizes no commit, merge, GitHub repository creation or push.
+  tests were explicitly approved. Preserve existing MySQL data. D-017 governs
+  real ingestion authorization during the delivery window.
+- Q-005 tracks outstanding real validation and publication. Q-004 is answered and
+  records the approved design for UI implementation. M2.3C is closed and Q-013
+  and Q-014 are deferred.
 - Explicit user restrictions override commit instructions in the workflow templates.
 - Team, ClickUp and Slack addons are disabled by user choice.
 - Do not infer domain requirements from the repository name.
@@ -155,8 +169,8 @@ https://github.com/Fleseriu-Stefan/p28-companywatch.
 Remote `origin` points to that repository; local `main` tracks `origin/main`.
 M1 package metadata uses version 0.1.0; no release, changelog or deployment
 procedure is approved. See `docs/CHECKPOINT.md` for the missing public deployment.
-Existing publication does not authorize future commits, merges, pushes or deploys.
-Creating history or publishing requires the user's explicit authorization.
+Use the D-017 delivery authorization during its window. After December 3,
+obtain approval for each commit, push, PR, merge, and deployment.
 
 ## 6. Definition of done
 - The ledger checker passes after every ledger change.

@@ -9,7 +9,6 @@
 ## Index
 - D-001 · All application servers run in Docker
 - D-003 · CompanyWatch technical stack
-- D-004 · Docker verification and continuous integration
 - D-005 · CompanyWatch requirements and dataset approval
 - D-002 · Figma approval with versioned local design mocks
 - D-006 · Approved ONRC development sources
@@ -22,6 +21,8 @@
 - D-013 · Schema review and publication
 - D-014 · Grouped ONRC aggregates
 - D-015 · Main dashboard and export semantics
+- D-016 · Docker verification on every push and on pull requests
+- D-017 · Temporary delivery authorization through December 3
 
 ---
 
@@ -40,14 +41,6 @@
 - **Rule:** Use React, TypeScript and Vite for the frontend; FastAPI for the backend; MySQL, SQLAlchemy, PyMySQL and Alembic for persistence; Docker Compose for application services. M1 supplies frontend structure and build tooling without visual UI pending D-002.
 - **Why:** Establish the first technical milestone without assuming dataset structure or visual requirements.
 - **Evidence:** User explicitly approved the M1 plan and D-003 on 2026-11-17.
-- **Confirmed:** 2026-11-27
-
-## D-004 · Docker verification and continuous integration
-- **Status:** approved
-- **Date:** 2026-11-17
-- **Rule:** Run application verification in Docker, with real MySQL integration tests. Use pytest and HTTPX for backend tests, Ruff for Python checks, TypeScript and ESLint for frontend checks, and GitHub Actions on pull requests and pushes to main. CI checks the ledger, backend tests, frontend build and Compose smoke behaviour. Pin compatible dependencies during implementation.
-- **Why:** Make M1 startup and verification reproducible locally and in CI.
-- **Evidence:** User explicitly approved the M1 plan and D-004 on 2026-11-17.
 - **Confirmed:** 2026-11-27
 
 ## D-005 · CompanyWatch requirements and dataset approval
@@ -146,3 +139,23 @@
 - **Why:** The main page supports the accountant's preliminary partner check. Both export formats must represent the same selected data across pagination.
 - **Evidence:** Section C questions 2–4 and 14–16 and explicit approval of this documentation package. See [main workflow acceptance](../P28-REQUIREMENTS.md#acceptance-for-the-main-workflow).
 - **Confirmed:** 2026-11-19
+
+## D-016 · Docker verification on every push and on pull requests
+- **Status:** approved
+- **Date:** 2026-11-28
+- **Rule:** Run GitHub Actions verification on every push and on pull requests. Run application verification in Docker with real MySQL integration tests. Use pytest and HTTPX for backend tests, Ruff for Python checks, and TypeScript and ESLint for frontend checks. CI checks the ledger, backend tests, frontend build and Compose smoke behaviour. Pin compatible dependencies during implementation.
+- **Why:** Verify feature branch revisions before PR review and give the owner green CI evidence for merges.
+- **Rejected:** Limit push-triggered verification to `main` as in D-004.
+- **Evidence:** The project owner explicitly approved D-016 and its supersession of D-004. [Delivery approval and scope](../../AI_LOG.md#2026-11-28--delivery-mode-approval-and-ci).
+- **Source:** Project owner · 2026-11-28.
+- **Confirmed:** 2026-11-28
+
+## D-017 · Temporary delivery authorization through December 3
+- **Status:** approved
+- **Date:** 2026-11-28
+- **Rule:** Through the end of 2026-12-03 in Europe/Bucharest, the project owner pre-authorizes commits and pushes on feature branches, opening pull requests, merging after CI is green for the current PR revision, full download and ingestion of the two D-006 editions (19.10.2026 and 04.11.2026), and deployment to the owner's Oracle VM. Each delivery plan is size S or M and covers one unit. Multi-gate campaigns are out of scope. D-017 takes precedence over conflicting per-action authorization rules and the original D-006 and D-008 implementation restrictions during this window. Per-action authorization resumes on 2026-12-04. D-007 raw-data protections, existing database protections, full source validation, and explicit approval before publication continue to apply.
+- **Why:** Focus work on the December 3 delivery and let approved delivery units proceed without repeated authorization for routine steps.
+- **Rejected:** Continue the M2.3C pilot, gate, or synthetic benchmark campaign. Carry the standing authorization past the delivery deadline.
+- **Evidence:** The project owner explicitly approved D-017 and deferred Q-013 and Q-014. [Delivery approval and scope](../../AI_LOG.md#2026-11-28--delivery-mode-approval-and-ci).
+- **Source:** Project owner · 2026-11-28.
+- **Confirmed:** 2026-11-28

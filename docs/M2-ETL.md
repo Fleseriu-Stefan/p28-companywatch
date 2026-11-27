@@ -210,15 +210,13 @@ test. [Rezultate și condiții de izolare](../AI_LOG.md#m23c-gate-1--bounded-fin
 
 Limita de citire pentru ingestie este de 120 s. Agregările de duplicate,
 actualizarea carantinei, agregările de calitate, copierea rândurilor și
-calculul amprentei pot genera încă operații mari. Q-013 și Q-014 rămân
-în investigare. Verificarea sintetică la 4.229.451 de rânduri, scalabilitatea
-aprobării și publicării și performanța diff-ului real au verificări separate.
+calculul amprentei pot genera încă operații mari. Proprietarul a închis
+M2.3C pe 28.11.2026 și a amânat Q-013 și Q-014. Campania de teste pilot,
+etape de validare și benchmarkuri sintetice s-a încheiat.
 
 Gate 2 (Q-013) a investigat întârzierile purge-ului InnoDB la curățarea de
 reluare, la finalizarea cu succes, la curățarea după eșec și la verificarea
-finală că staging-ul este gol. Gate 4 va măsura spațiul simultan ocupat de
-staging și rândurile pregătite, spațiul pentru undo și rezerva necesară
-pentru recuperare după întrerupere.
+finală că staging-ul este gol.
 
 #### Gate 2 A1 — pilot sintetic
 
@@ -333,11 +331,8 @@ Toate cele opt proiecte au confirmat codurile de ieșire 143 pentru runner
 și 0 pentru MySQL înainte de eliminare. Resursele sintetice au fost
 eliminate, iar etichetele volumelor protejate au rămas neschimbate.
 Proprietarul a aprobat amânarea A2 și Stage B și păstrarea curățării
-existente. Validarea performanței Gate 2 rămâne incompletă. Q-013 poate fi
-reluată dacă latența curățării sau timpul de deținere a lock-ului pe pointer
-devine un blocaj măsurabil ori dacă atribuirea efectului purge este necesară
-pentru o viitoare decizie de ingestie. Îmbunătățirile protocolului rămân
-propuneri. Gate 3 (Q-014) poate fi investigată separat după aprobare.
+existente. Validarea performanței Gate 2 a rămas incompletă la închiderea
+campaniei M2.3C.
 [Checkpoint Gate 2 și protocolul propus](M2.3C-GATE-2-CHECKPOINT.md)
 · [Probe sintetice sanitizate](evidence/m2-3c-gate2-a1.json)
 

@@ -30,10 +30,18 @@ It is now published at https://github.com/Fleseriu-Stefan/p28-companywatch.
 Remote `origin` points to that repository; local `main` tracks `origin/main`.
 Follow AGENTS.md synchronization rules now that the remote and upstream exist.
 Explicit user authorization overrides automatic branch and commit steps in the original templates.
-M1 and M2 are merged into `main`. The verification workflow runs on pull
-requests and pushes to `main`. Each new commit, push, PR, merge, deployment,
-full ONRC download or change to the existing M1 database requires authorization
-for that action. Team, ClickUp and Slack addons are disabled by user choice.
+M1 and M2 are merged into `main`. Under D-016, verification runs on every
+push and on pull requests. Team, ClickUp and Slack addons are disabled by user choice.
+
+## Delivery mode through December 3, 2026
+Under D-017, plan one S or M delivery unit at a time. The M2.3C campaign is
+closed. Through the end of December 3 in Europe/Bucharest, the project owner
+pre-authorizes feature-branch commits and pushes, opening PRs, merging after CI
+is green for the current PR revision, full download and ingestion of the two
+D-006 editions (19.10.2026 and 04.11.2026), and deployment to the owner's Oracle
+VM. Per-action authorization resumes December 4. Preserve existing MySQL data
+and follow the protected raw-data, validation, and manual publication rules in
+D-007, D-008 and C-002.
 
 ## Design
 Keep local mocks, tokens and screenshots under docs/design/.
