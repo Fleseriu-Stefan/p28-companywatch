@@ -128,7 +128,7 @@ performance and live acceptance rows track their own evidence.
 | GitHub Actions runs tests and ledger-lint.py | General CI | CI invokes the shared verifier. Prior M2 success is documented. | Implemented | Run the complete suite for the submission revision. | Green CI run tied to final commit. |
 | Public HTTPS deployment | General deployment | Local API binds to loopback. | Missing | Select hosting, obtain authorization and deploy the complete app. | Public HTTPS URL, live workflow and persistence evidence. |
 | README, architecture docs, .env.example and SUBMISSION.md | General documentation | First three files exist. SUBMISSION.md is absent. | Partial | Update final setup and architecture evidence and prepare SUBMISSION.md. | Review documented install and final evidence links. |
-| At least ten genuine AI_LOG.md entries | General workflow | One approved Section C entry. | Partial | Record actual work sessions and outcomes as they occur. | Ten dated, substantive entries. |
+| At least ten genuine AI_LOG.md entries | General workflow | 33 dated entries in [AI_LOG.md](../AI_LOG.md). | Implemented | Continue recording actual work sessions and outcomes. | Ten dated, substantive entries. |
 | At least 25 meaningful commits on at least eight distinct days | General workflow | Six commits on three author dates on the audited main branch. | Partial | Record meaningful authorized changes over real working days. | Final main history and distinct author dates. |
 | Final 3–5 minute demonstration and evidence-based Definition of Done | General submission | Checkpoint and this matrix track the evidence gaps. | Partial | Record the working demo and tie each final claim to evidence. | Timed video, live URL, CI, measured diff and actual user feedback. |
 

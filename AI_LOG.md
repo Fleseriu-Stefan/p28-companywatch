@@ -1,5 +1,12 @@
 # AI log
 
+## 2026-11-28 · Delivery mode approval and CI
+
+- **Tool (Codex, prompt)** — Codex. “Approve both proposals: D-016 (CI on every push and on pull requests, supersedes D-004) and D-017 (temporary delivery authorization through Dec 3).”
+- **What I asked** — Close M2.3C, defer Q-013 and Q-014, record the temporary delivery authorization, enable CI on every push and on pull requests, and correct the design and log references. Commit the changes on `chore/delivery-mode`, open a PR to `main`, and merge when CI is green.
+- **What I got** — The delivery rules, CI trigger, ledger and documentation updates, plus verification with the ledger checker and isolated Docker suite.
+- **What I did with it** — Approved D-016 and D-017 and authorized the delivery PR and its merge after green CI.
+
 ## 2026-11-27 · M2.3C Gate 2 checkpoint and owner deferral
 
 The owner accepted eight valid A1 trials, four inconclusive purge

@@ -3,7 +3,6 @@ name: M1/M2 verification
 on:
   pull_request:
   push:
-    branches: [main]
 
 permissions:
   contents: read
