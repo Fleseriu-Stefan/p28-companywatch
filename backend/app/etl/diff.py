@@ -22,9 +22,14 @@ def require_published(connection, old_id, new_id, *, allow_synthetic):
         raise ETLError("synthetic_not_allowed")
 
 
-def comparison(old_id, new_id):
-    old = select(companies).where(companies.c.version_id == old_id).subquery("old_rows")
-    new = select(companies).where(companies.c.version_id == new_id).subquery("new_rows")
+def comparison(old_id, new_id, *, after=None):
+    old = select(companies).where(companies.c.version_id == old_id)
+    new = select(companies).where(companies.c.version_id == new_id)
+    if after is not None:
+        old = old.where(companies.c.euid > after)
+        new = new.where(companies.c.euid > after)
+    old = old.subquery("old_rows")
+    new = new.subquery("new_rows")
     match = old.c.euid == new.c.euid
     changed = {
         field: ~old.c[field].is_not_distinct_from(new.c[field])
@@ -65,8 +70,8 @@ def compare(engine, old_id, new_id, *, allow_synthetic=False):
     }
 
 
-def detail_statement(old_id, new_id):
-    old, new, match, changed = comparison(old_id, new_id)
+def detail_statement(old_id, new_id, *, after=None):
+    old, new, match, changed = comparison(old_id, new_id, after=after)
     sides = [
         rows.c[field].label(f"{side}_{field}")
         for side, rows in (("previous", old), ("current", new))
@@ -114,10 +119,18 @@ def detail_row(row):
 
 
 @contextmanager
-def compare_details(engine, old_id, new_id, *, allow_synthetic=False):
+def compare_details(
+    engine, old_id, new_id, *, allow_synthetic=False, after=None, change_type=None, limit=None
+):
     """Stream SQL-classified rows while the caller owns the context."""
     with engine.connect() as connection:
         require_published(connection, old_id, new_id, allow_synthetic=allow_synthetic)
-        statement = detail_statement(old_id, new_id)
+        statement = detail_statement(old_id, new_id, after=after)
+        if limit is not None:
+            details = statement.subquery("diff_rows")
+            statement = select(details)
+            if change_type is not None:
+                statement = statement.where(details.c.change_type == change_type)
+            statement = statement.order_by(details.c.euid).limit(limit)
         with connection.execute(statement, execution_options={"yield_per": 256}) as result:
             yield (detail_row(row) for row in result.mappings())

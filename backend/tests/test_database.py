@@ -25,11 +25,14 @@ def test_baseline_and_repeated_migration(engine):
         connection.execute(text("CREATE TABLE m1_upgrade_marker (id INT PRIMARY KEY, value INT)"))
         connection.execute(text("INSERT INTO m1_upgrade_marker VALUES (1, 42)"))
     check_partial_migration_recovery(engine, config)
+    check_company_index_migration(engine, config)
     command.upgrade(config, "head")
     command.upgrade(config, "head")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT value FROM m1_upgrade_marker WHERE id=1")) == 42
-        assert MigrationContext.configure(connection).get_current_heads() == ("0002_etl",)
+        assert MigrationContext.configure(connection).get_current_heads() == (
+            "0003_public_api_indexes",
+        )
     assert is_database_ready(engine)
 
 
@@ -72,7 +75,7 @@ def check_partial_migration_recovery(engine, config):
             connection.execute(
                 text("INSERT INTO dataset_publications (dataset) VALUES ('onrc-firme-pj')")
             )
-    command.upgrade(config, "head")
+    command.upgrade(config, "0002_etl")
     assert set(inspect(engine).get_table_names()) == {
         "alembic_version",
         "m1_upgrade_marker",
@@ -86,10 +89,36 @@ def check_partial_migration_recovery(engine, config):
         assert connection.execute(text(seed)).all() == [(None,)]
 
 
+def check_company_index_migration(engine, config):
+    def interrupt(connection, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().startswith("UPDATE alembic_version"):
+            raise RuntimeError("synthetic_index_migration_interruption")
+
+    event.listen(Engine, "before_cursor_execute", interrupt)
+    try:
+        with pytest.raises(RuntimeError, match="synthetic_index_migration_interruption"):
+            command.upgrade(config, "head")
+    finally:
+        event.remove(Engine, "before_cursor_execute", interrupt)
+
+    indexes = {
+        index["name"]: index["column_names"]
+        for index in inspect(engine).get_indexes("company_version_rows")
+    }
+    assert indexes == {
+        "ix_company_version_name": ["version_id", "name"],
+        "ix_company_version_cui": ["version_id", "cui"],
+        "ix_company_version_county_locality": ["version_id", "county", "locality"],
+    }
+    with engine.connect() as connection:
+        assert MigrationContext.configure(connection).get_current_heads() == ("0002_etl",)
+
+
 def test_real_mysql_readiness_and_schema_mismatch(engine):
     with TestClient(create_app(engine)) as client:
         assert client.get("/health/ready").status_code == 200
         with engine.begin() as connection:
+            revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
             connection.execute(text("UPDATE alembic_version SET version_num = 'outdated'"))
         try:
             response = client.get("/health/ready")
@@ -97,4 +126,7 @@ def test_real_mysql_readiness_and_schema_mismatch(engine):
             assert response.json() == {"status": "not_ready"}
         finally:
             with engine.begin() as connection:
-                connection.execute(text("UPDATE alembic_version SET version_num = '0002_etl'"))
+                connection.execute(
+                    text("UPDATE alembic_version SET version_num = :revision"),
+                    {"revision": revision},
+                )

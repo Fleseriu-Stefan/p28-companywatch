@@ -46,7 +46,9 @@ def check_git_exclusions():
     failures = []
     for path in (*ignored, *addable):
         result = subprocess.run(
-            ["git", "check-ignore", "--no-index", "--quiet", "--", path], cwd=ROOT, check=False
+            ["git", "check-ignore", "--no-index", "--quiet", "--", path],
+            cwd=ROOT,
+            check=False,
         )
         if result.returncode not in (0, 1) or (result.returncode == 0) != (path in ignored):
             failures.append(path)
@@ -251,6 +253,9 @@ def main() -> None:
             capture=True,
         ).stdout
         assert "CREATE TABLE etl_versions" in offline and "0002_etl" in offline
+        assert (
+            "ADD INDEX ix_company_version_name" in offline and "0003_public_api_indexes" in offline
+        )
         for subcommand in ("sources", "--help"):
             compose("run", "--rm", "etl", subcommand)
             assert not compose("ps", "-a", "-q", "db", "migrate", capture=True).stdout.strip()
@@ -354,7 +359,7 @@ def main() -> None:
             "engine = create_database_engine(Settings.from_env()); "
             "connection = engine.connect(); "
             "assert MigrationContext.configure(connection).get_current_heads() "
-            "== ('0002_etl',); connection.close(); engine.dispose()",
+            "== ('0003_public_api_indexes',); connection.close(); engine.dispose()",
         )
         compose("up", "-d", "--wait", "--wait-timeout", "180", "api")
         await_ready(api_url())

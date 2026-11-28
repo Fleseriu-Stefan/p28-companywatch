@@ -10,6 +10,7 @@
 - PATTERN-002 · Review seals for immutable ETL snapshots · candidate
 - PATTERN-003 · Bounded recovery under a session lock · candidate
 - PATTERN-004 · Restore a published snapshot database before startup · candidate
+- PATTERN-005 · Resume an atomic MySQL index migration · candidate
 
 ---
 
@@ -43,3 +44,9 @@ No application patterns are approved for replication.
 - **Status:** candidate
 - **How:** Restore the application schema, migration revision and publication pointer into an empty database before running migrations. Compare both published versions and the current pointer before and after a container recreate with the same volume.
 - **Example:** [Azure deployment procedure](../DEPLOY.md).
+
+## PATTERN-005 · Resume an atomic MySQL index migration
+- **Status:** candidate
+- **Date:** 2026-11-28
+- **How:** Add related indexes in one atomic ALTER TABLE. On retry, compare the existing index definitions with the intended definitions before advancing the Alembic revision. Keep the migration read timeout independent of HTTP query timeouts.
+- **Example:** `backend/migrations/versions/0003_public_api_indexes.py` and the interrupted migration check in `backend/tests/test_database.py`.

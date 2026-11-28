@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import Engine
 
-from app.api.health import router
+from app.api.health import router as health_router
+from app.api.onrc import router as onrc_router
 from app.config import Settings
 from app.db import create_database_engine
 
@@ -22,7 +23,8 @@ def create_app(engine: Engine | None = None) -> FastAPI:
             database_engine.dispose()
 
     application = FastAPI(title="CompanyWatch API", version="0.1.0", lifespan=lifespan)
-    application.include_router(router)
+    application.include_router(health_router)
+    application.include_router(onrc_router)
     return application
 
 
