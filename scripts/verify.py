@@ -23,6 +23,7 @@ class IsolationError(RuntimeError):
 def check_git_exclusions():
     ignored = (
         ".env",
+        ".env.production",
         "backend/.env.local",
         "data/raw.zip",
         "etl-private/source.part",
@@ -38,6 +39,7 @@ def check_git_exclusions():
     )
     addable = (
         ".env.example",
+        ".env.production.example",
         "backend/app/etl/service.py",
         "frontend/package-lock.json",
     )
