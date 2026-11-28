@@ -154,10 +154,10 @@
 ## D-017 · Temporary delivery authorization through December 3
 - **Status:** approved
 - **Date:** 2026-11-28
-- **Rule:** Through the end of 2026-12-03 in Europe/Bucharest, the project owner pre-authorizes commits and pushes on feature branches, opening pull requests, merging after CI is green for the current PR revision, full download and ingestion of the two D-006 editions (19.10.2026 and 04.11.2026), and deployment to the owner's Oracle VM. Each delivery plan is size S or M and covers one unit. Multi-gate campaigns are out of scope. D-017 takes precedence over conflicting per-action authorization rules and the original D-006 and D-008 implementation restrictions during this window. Per-action authorization resumes on 2026-12-04. D-007 raw-data protections, existing database protections, full source validation, and explicit approval before publication continue to apply.
+- **Rule:** Through the end of 2026-12-03 in Europe/Bucharest, the project owner pre-authorizes commits and pushes on feature branches, opening pull requests, merging after CI is green for the current PR revision, full download and ingestion of the two D-006 editions (19.10.2026 and 04.11.2026), and deployment to the Azure VM `companywatch-live`. Each delivery plan is size S or M and covers one unit. Multi-gate campaigns are out of scope. D-017 takes precedence over conflicting per-action authorization rules and the original D-006 and D-008 implementation restrictions during this window. Per-action authorization resumes on 2026-12-04. D-007 raw-data protections, existing database protections, full source validation, and explicit approval before publication continue to apply.
 - **Why:** Focus work on the December 3 delivery and let approved delivery units proceed without repeated authorization for routine steps.
 - **Rejected:** Continue the M2.3C pilot, gate, or synthetic benchmark campaign. Carry the standing authorization past the delivery deadline.
-- **Evidence:** The project owner explicitly approved D-017 and deferred Q-013 and Q-014. [Delivery approval and scope](../../AI_LOG.md#2026-11-28--delivery-mode-approval-and-ci).
+- **Evidence:** The project owner explicitly approved D-017, deferred Q-013 and Q-014, and subsequently replaced the Oracle deployment target with Azure. [Delivery approval](../../AI_LOG.md#2026-11-28--delivery-mode-approval-and-ci) · [Azure approval](../../AI_LOG.md#2026-11-28--minimal-azure-production-deployment).
 - **Source:** Project owner · 2026-11-28.
 - **Confirmed:** 2026-11-28
 

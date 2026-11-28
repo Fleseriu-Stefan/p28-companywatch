@@ -13,9 +13,9 @@
 - Q-002 · Which application stack and Docker services should this project use? · _answered_
 - Q-003 · Which install, build, run, test and lint/type-check commands should verify the application? · _answered_
 - Q-004 · What UI, design tokens, viewport sizes and screenshot procedure are required? · _answered_
-- Q-005 · Which public dataset and real versions can be approved? · _investigating_
+- Q-005 · Which public dataset and real versions can be approved? · _answered_
 - Q-006 · What interview evidence and checkpoint rubric must be delivered? · _investigating_
-- Q-007 · Where and how should the public deployment run?
+- Q-007 · Where and how should the public deployment run? · _answered_
 - Q-008 · Can the verified legal-entity subset be extended?
 - Q-009 · How often should scheduled ETL check for ONRC updates?
 - Q-010 · How should the real SQL diff benchmark be measured? · _answered_
@@ -49,12 +49,10 @@
 - **Answer:** On 2026-11-19 the project owner personally confirmed visual equivalence and approved all nine CompanyWatch Draft 1 screens under D-002. The approval applies to the screen designs, states and tokens represented in the pinned HTML mock and Figma review frames. Review the mock at 360, 768 and 1440 px in both themes, with the registered desktop and mobile Chromium captures as the visual references. Apply the documented keyboard and narrow-screen checks and agree on an application screenshot command in the implementation plan. [Design approval and review procedure](../design/DESIGN.md#etapa-d--registrul-onrc) · [Screen registry](../design/registry.yaml).
 
 ## Q-005 · Which public dataset and real versions can be approved?
-- **Status:** investigating
-- **Blocks:** Publication of real ONRC data until full-file validation; does not block the approved synthetic M2 build.
+- **Status:** answered
 - **Who answers:** Project owner, after source investigation.
-- **Partial answer:** User approved the two verified OD_FIRME.CSV editions (19.10.2026 and 04.11.2026) for M2 development, the candidate EUID key, minimal legal-entity fields and temporary protected raw processing. D-006–D-008 and C-002 govern implementation. The owner later explicitly authorized full downloads and isolated ingestion for both approved editions. The October edition was fully downloaded and 4,229,451 source rows were staged, but ingestion failed during duplicate aggregation; no complete quality report or accepted snapshot was produced. The November edition was not downloaded, and no version was published. D-017 pre-authorizes full downloads and ingestion of both editions through December 3, 2026. The existing development data remains protected. Complete eligible counts and global quality for both editions must be measured before manual publication. See ../ONRC-SOURCE.md.
-- **Still open:** Measure total source rows, eligible legal entities per edition, and real SQL diff input size separately. If the approved editions cannot meet the requirements or the existing publication gate, investigate another official ONRC edition first and present it for separate approval. Keep the approved classification.
-- **Follow-up evidence:** The second authorized October attempt lost its connection during `prepare_attempt`. The [M2.3A diagnosis](../M2-ETL.md#m23a--starea-după-a-doua-încercare) records the recovered database state. No complete report or publication resulted.
+- **Answer:** Both OD_FIRME.CSV editions (19.10.2026 and 04.11.2026) passed full-file validation with the approved D-018 subset. The owner approved both quality reports and published the editions locally in order. October has 120,000 accepted EUIDs and November has 120,163. November is current. [Step B evidence](../../DATA.md#calitatea-edițiilor-publicate).
+- **Confirmed:** 2026-11-28
 
 ## Q-006 · What interview evidence and checkpoint rubric must be delivered?
 - **Status:** investigating
@@ -63,10 +61,10 @@
 - **Partial answer:** The [committed interview summary](../../INTERVIEW.md) records the real interview. The owner supplied the authoritative [P28 and general requirements](../P28-REQUIREMENTS.md) and approved the Section C audit. Preserve the summary. Add actual feedback after the accountant tries the working demo.
 
 ## Q-007 · Where and how should the public deployment run?
-- **Status:** open
-- **Blocks:** Public URL, hosting, production configuration and deployment.
+- **Status:** answered
 - **Who answers:** Project owner.
-- **Partial answer:** The owner selected their Oracle VM and pre-authorized deployment through December 3, 2026 under D-017. The owner requires public HTTPS with persistent MySQL, scheduled ETL and all P28 features. D-001 applies to every application server. Compose remains required for complete local development. The public URL and production configuration are still open.
+- **Answer:** The owner selected Azure VM `companywatch-live` and `https://companywatch-sf.austriaeast.cloudapp.azure.com`. The initial deployment uses Docker Compose, Caddy HTTPS, and persistent MySQL restored from the local published database. The owner authorized generating and storing the database credentials in the VM's ignored mode-600 `.env.production`. Scheduled ETL and the remaining P28 features are later delivery units. [Deployment procedure](../DEPLOY.md).
+- **Confirmed:** 2026-11-28
 
 ## Q-008 · Can the verified legal-entity subset be extended?
 - **Status:** open
@@ -86,7 +84,7 @@
 - **Status:** answered
 - **Who answers:** Project owner.
 - **Answer:** On 2026-11-19 the owner approved timing the complete per-company SQL diff separately from Python result-stream consumption. Use two published real ONRC editions with at least 100,000 accepted legal-entity records each. Warm up, record at least three complete timed runs with an under-30-second SQL target, and preserve every timing, the `EXPLAIN ANALYZE` output, the environment and the reproducible command. [Approved benchmark protocol](../M2.1-BENCHMARK.md#protocol-aprobat-pentru-diff-ul-sql-pe-date-reale).
-- **Evidence pending:** The benchmark has yet to be run. Q-005 still gates real validation and publication.
+- **Evidence:** [Step B measurements for both published editions](../M2.1-BENCHMARK.md#rezultate-q-010--2026-10-19--2026-11-04).
 - **Confirmed:** 2026-11-27
 
 ## Q-011 · What API request limits and quotas should apply?

@@ -11,7 +11,7 @@ The frontend has build tooling and a React entry rendering null; it has no visua
 The backend exposes the health/documentation contract C-001. M2 adds a Docker CLI
 and minimal legal-entity ETL snapshots under C-002, with synthetic verification.
 Q-004 records the approved Draft 1 design for future UI implementation. Q-005
-blocks real publication until complete validation.
+records validation and publication of both ONRC editions in the local database.
 
 ## Parts
 | Part | Path | Responsibility | Talks to |
@@ -75,7 +75,7 @@ sequenceDiagram
 
 The publication pointer selects the current snapshot; version IDs allow explicit
 historical comparisons. A disappearance is relative to the compared exports.
-Real company data has yet to be imported.
+The local Step B database contains both published editions under D-018.
 [ETL contract C-002](CONTRACTS.md#c-002--etl-snapshots-and-publication-boundary)
 
 ## State and storage
@@ -114,11 +114,12 @@ All application servers run in Docker (D-001). Backend and frontend base images
 are pinned by digest; Python and npm dependencies are locked. The tests and
 frontend build are optional Compose tools, not additional public servers.
 See ../../README.md for executable commands. CI uses the same verification script.
-No deployment or public URL exists; see ../CHECKPOINT.md. No new Python dependency
+Production uses `compose.prod.yaml` with Caddy as the HTTPS entry point.
+See [the Azure deployment procedure](../DEPLOY.md). No new Python dependency
 was introduced for M2: HTTPX, SQLAlchemy and the standard library are reused.
 
 ## Boundaries
 The API owns C-001 in CONTRACTS.md. Consumers are the Compose healthcheck, tests
 and verification script. There are no frontend API consumers or external dataset
 HTTP contracts yet. C-002 describes ETL consumers and published-snapshot semantics.
-No auth or production deployment architecture is selected. See ../M2-ETL.md.
+See ../M2-ETL.md for the ingestion and publication procedure.

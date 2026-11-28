@@ -10,6 +10,9 @@ milestone-uri. Rularea locală completă M2 a trecut 46 de teste cu date sinteti
 și MySQL izolat. Vezi [M1-VERIFICATION.md](M1-VERIFICATION.md) și
 [M2-VERIFICATION.md](M2-VERIFICATION.md).
 
+Pentru stadiul ulterior acestui checkpoint, vezi [edițiile publicate](../DATA.md)
+și [procedura de deploy pe Azure](DEPLOY.md).
+
 | Livrabil | Stare curentă M1 și M2 | Dovezi necesare în etapa următoare |
 |---|---|---|
 | Structură React/FastAPI/MySQL și Docker | Integrată în M1 și verificată local | Configurare pentru mediul public după aprobarea lui |
@@ -41,9 +44,8 @@ deschise în [Q-006](agents/OPEN-QUESTIONS.md#q-006--what-interview-evidence-and
 
 ## Publicare
 
-Adresa locală din README nu este un URL public. CI verifică aplicația și nu o
-publică. Alegerea hostingului și aprobarea deploy-ului rămân Q-007. Orice server
-folosit ulterior trebuie să respecte D-001.
+CI verifică aplicația. Q-007 consemnează aprobarea VM-ului Azure și a adresei
+publice. Procedura de deploy folosește Docker, conform D-001.
 
 ## Etape următoare
 

@@ -31,7 +31,7 @@ and covers one delivery unit. Multi-gate campaigns are out of scope. Through the
 end of December 3 in Europe/Bucharest, the project owner pre-authorizes commits
 and pushes on feature branches, opening PRs, merging after CI is green for the
 current PR revision, full download and ingestion of the two D-006 editions
-(19.10.2026 and 04.11.2026), and deployment to the owner's Oracle VM. D-017 takes
+(19.10.2026 and 04.11.2026), and deployment to Azure VM `companywatch-live`. D-017 takes
 precedence over conflicting authorization rules for these actions. Per-action
 authorization resumes December 4. Preserve existing database data and follow
 the raw-data, validation, and manual publication rules in D-007, D-008 and C-002.
@@ -70,6 +70,9 @@ without new evidence. A rejected proposal is added there with the reason.
   User-authorized local exception: MySQL passwords may be generated once and kept
   in the untracked, Git-ignored `.env` with mode `600`. Never print or commit them;
   preserve existing database credentials and data.
+  User-authorized production exception: generate MySQL passwords once on
+  `companywatch-live` and keep them in the Git-ignored `.env.production` with
+  mode `600`. Never print or commit them.
   User-authorized M2 exception: real ONRC raw files may exist only temporarily in
   the protected ETL tmpfs, never in Git/logs/public artifacts. Persist only the
   minimal verified legal-entity projection (D-007); remove raw data after processing.
@@ -101,8 +104,7 @@ without new evidence. A rejected proposal is added there with the reason.
 p28-companywatch is a Tehnologii Web II ETL + API + Dashboard project.
 M1 provides Docker infrastructure, health API and frontend tooling without visual UI.
 M2 implements the ETL lifecycle, minimal legal-entity snapshots and SQL diff.
-Two ONRC development editions are approved (D-006). A full real import and
-publication are pending. See `docs/CHECKPOINT.md` and Q-005.
+Both D-006 ONRC editions are published locally. See `DATA.md` and Q-005.
 
 ## 2. Stack and commands
 Approved stack: React + TypeScript + Vite, FastAPI, MySQL, SQLAlchemy, PyMySQL,
@@ -154,7 +156,7 @@ the approved resources without downloading them. See `docs/M2-ETL.md` for the CL
 - M2 synthetic implementation, D-006–D-008/C-002 and evolution of M1 migration
   tests were explicitly approved. Preserve existing MySQL data. D-017 governs
   real ingestion authorization during the delivery window.
-- Q-005 tracks outstanding real validation and publication. Q-004 is answered and
+- Q-005 records real validation and local publication. Q-004 is answered and
   records the approved design for UI implementation. M2.3C is closed and Q-013
   and Q-014 are deferred.
 - Explicit user restrictions override commit instructions in the workflow templates.
@@ -167,8 +169,7 @@ At initial setup, the branch was `main`, without commits, remote or upstream.
 The repository is now published on GitHub at
 https://github.com/Fleseriu-Stefan/p28-companywatch.
 Remote `origin` points to that repository; local `main` tracks `origin/main`.
-M1 package metadata uses version 0.1.0; no release, changelog or deployment
-procedure is approved. See `docs/CHECKPOINT.md` for the missing public deployment.
+M1 package metadata uses version 0.1.0. See `docs/DEPLOY.md` for the Azure procedure.
 Use the D-017 delivery authorization during its window. After December 3,
 obtain approval for each commit, push, PR, merge, and deployment.
 
