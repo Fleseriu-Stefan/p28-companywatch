@@ -1,11 +1,15 @@
 import json
+from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
+from app.etl import cli, subset
 from app.etl.cli import main
 from app.etl.errors import ETLError
 from app.etl.service import quality_deltas
+from tests.etl_fixtures import csv_file, row
 
 
 def test_real_download_needs_explicit_consent_before_database_or_network(capsys):
@@ -26,6 +30,37 @@ def test_real_import_refuses_persistent_raw_storage(capsys):
         with patch("app.etl.cli.downloaded", side_effect=AssertionError("No network allowed")):
             assert main(["ingest", "--edition", "2026-10-19", "--allow-real-download"]) == 2
     assert "raw_tmpfs_required" in capsys.readouterr().err
+
+
+def test_calibration_streams_one_artifact_at_a_time_without_database(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(cli, "CALIBRATION_TARGET", 2)
+    monkeypatch.setattr(subset, "CALIBRATION_TARGET", 2)
+    monkeypatch.setattr(cli, "require_raw_tmpfs", lambda: None)
+    visited, open_artifacts = [], []
+
+    @contextmanager
+    def download(source, directory):
+        assert not open_artifacts
+        assert directory.name == "etl-private"
+        visited.append(source.edition)
+        open_artifacts.append(source.edition)
+        path = csv_file(tmp_path / source.edition, [row(1), row(2), row(3)])
+        try:
+            yield SimpleNamespace(path=path, sha256="a" * 64)
+        finally:
+            open_artifacts.pop()
+
+    monkeypatch.setattr(cli, "downloaded", download)
+    with patch("app.etl.cli.create_database_engine") as engine:
+        assert main(["calibrate"]) == 2
+        assert not visited
+        assert main(["calibrate", "--allow-real-download"]) == 0
+        engine.assert_not_called()
+    result = json.loads(capsys.readouterr().out)
+    assert visited == list(subset.SOURCES)
+    assert not open_artifacts
+    assert all("rank_hash" not in edition for edition in result["editions"].values())
+    assert subset.validate_calibration(result) == int(result["threshold"], 16)
 
 
 @pytest.mark.parametrize(

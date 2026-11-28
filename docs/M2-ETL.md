@@ -43,20 +43,23 @@ pentru un câmp foarte mare produce eroare de fișier, nu pierdere de conținut.
 4. Parserul validează BOM, UTF-8 strict, antetul exact de 20 de coloane, separatorul
    `^`, ghilimelele literale și lățimea fiecărui rând. Erorile de schemă/decodare
    invalidează întregul import. Nu se face ALTER TABLE după antetul unui fișier.
-5. Staging-ul primește loturi de maximum 1.000 de rânduri. Datele excluse nu sunt
-   copiate în coloanele de companii. Pentru a detecta EUID repetat oriunde în sursă,
-   inclusiv într-un rând exclus/necunoscut, staging-ul folosește HMAC-uri temporare
-   cu o cheie aleatoare numai în memoria workerului. Identificatorii excluși nu
-   sunt salvați; amprentele nu sunt reutilizabile între importuri.
+5. Pentru profilul `onrc-pj-subset-v1`, parserul aplică pragul D-018 înainte de
+   staging. Loturile de maximum 1.000 păstrează toate aparițiile EUID-urilor
+   selectate, inclusiv rândurile excluse sau invalide, cu HMAC-uri temporare
+   pentru detectarea duplicatelor. Cheia HMAC rămâne în memoria workerului, iar
+   rândurile excluse și invalide din subset au proiecția de companie goală.
 6. EUID lipsă, nepotrivit cu înmatricularea sau duplicat este carantinat. Toți
    membrii unui grup duplicat sunt respinși; nu există last-write-wins. CUI `0`
    este păstrat și raportat ca problemă, fără utilizare ca identitate. Numele lipsă,
    datele calendaristice invalide și depășirile limitelor sunt raportate.
-7. Raportul reconciliază `source_records = accepted_records + quarantined_records
-   + excluded_records`, cu motive, câmpuri nule, CUI zero și grupuri duplicate.
+7. Raportul subsetului reconciliază `source_records = accepted_records + quarantined_records
+   + excluded_records + out_of_subset_records`, cu motive, câmpuri nule, CUI zero
+   și grupuri duplicate. Rândurile invalide contribuie la carantină chiar și în
+   afara staging-ului. `duplicate_key_scope` identifică duplicatele EUID-urilor
+   selectate, iar manifestul conține statisticile integrale din calibrare.
    Numărul pe motiv poate suprapune alte motive; nu se însumează ca total de rânduri.
    Sunt păstrate maximum 20 de exemple cu ordinal/cod, fără chei sau valori brute.
-8. Rapoartele noi, cu `quality_format: 1`, includ distribuțiile
+8. Rapoartele subsetului (`quality_format: 2`) și cele anterioare cu formatul 1 includ distribuțiile
    `source_legal_forms` și `accepted_legal_forms`. Prima cuprinde toate
    rândurile parsate în categoriile SRL, SA, SNC, `missing` și `other`.
    Valorile necunoscute nu apar în raport. A doua numără SRL, SA și SNC după
@@ -338,8 +341,9 @@ campaniei M2.3C.
 
 ## Aprobare, publicare și diff
 
-`approve` cere amprenta exactă a raportului, verifică rezultatul complet și minimum
-100.000 de rânduri acceptate pentru date reale. Aprobarea leagă manifestul,
+`approve` cere amprenta exactă a raportului și verifică rezultatul complet.
+Profilul D-018 cere minimum 110.000 EUID-uri distincte acceptate pentru fiecare
+ediție reală. Aprobarea leagă manifestul,
 SHA-256, profilul/sche­ma, raportul și amprenta rândurilor pregătite. `publish`
 cere acea aprobare și reverifică integritatea înainte de a lua lock-ul publicației.
 Tranzacția scurtă InnoDB reverifică sigiliul și actualizează pointerul și starea
@@ -502,7 +506,8 @@ indicatori, rezultatul este `unavailable`, cu motivul `legacy_report`.
 Reingestia identică păstrează raportul existent și sigiliile lui.
 
 Rezultatul include diferențe semnate între numărători și diferențe de rată în
-puncte procentuale. Ratele de acceptare, excludere, carantină și duplicate
+puncte procentuale. Ratele de acceptare, excludere, carantină, duplicate și, pentru subset,
+rânduri valide din afara subsetului
 folosesc totalul rândurilor sursă din fiecare ediție. Distribuțiile folosesc
 totalul rândurilor sursă, respectiv acceptate. Rezultatul include ambii
 numitori, iar diferența de rată este `null` dacă un numitor este zero.
@@ -559,9 +564,10 @@ pentru o instalare nouă și nu poate valida starea unei migrări parțiale.
 
 ## O nouă încercare de import real — pași care cer autorizare separată
 
-1. Obține aprobarea explicită pentru descărcările integrale și pentru baza țintă.
+1. Obține aprobarea explicită pentru etapa B și confirmă baza țintă.
 2. Reverifică metadatele oficiale, URL-urile, licența și dimensiunile; verifică
-   memoria tmpfs și spațiul MySQL. Dacă sursa s-a schimbat, revizuiește profilul.
+   memoria disponibilă pentru tmpfs și dicționarul Python de hash-uri, plus
+   spațiul MySQL. Dacă sursa s-a schimbat, oprește importul pentru revizuire.
 3. Pentru prima probă folosește un proiect nou, separat de `companywatch`, și
    păstrează `.env` existent privat. De exemplu, după autorizare:
 
@@ -571,12 +577,23 @@ pentru o instalare nouă și nu poate valida starea unei migrări parțiale.
    export API_PORT=8001
    docker compose build api
    COMPANYWATCH_M2_MIGRATE=1 docker compose up -d --wait --wait-timeout 180 api
-   docker compose run --rm --no-deps etl ingest --edition 2026-10-19 --allow-real-download
+   docker compose run --rm --no-deps -T etl calibrate --allow-real-download > onrc-calibration.json
+   docker compose run --rm --no-deps -T etl ingest --edition 2026-10-19 \
+     --allow-real-download --calibration - < onrc-calibration.json
+   docker compose run --rm --no-deps -T etl ingest --edition 2026-11-04 \
+     --allow-real-download --calibration - < onrc-calibration.json
    ```
 
-4. Din JSON-ul întors, preia ID-ul versiunii și amprenta raportului în variabilele
-   `VERSION_ID` și `REPORT_HASH`. Inspectează raportul și toate motivele de
-   carantină/excludere. Aceste amprente nu sunt parole sau credențiale.
+   Calibrarea deschide câte un fișier brut în tmpfs și citește rândurile în Python,
+   fără conexiune la MySQL. JSON-ul rezultat conține pragul comun, cele două
+   SHA-256 ale fișierelor și statistici agregate. Folosește același JSON la ambele
+   ingestii. Prima ingestie leagă calibrarea de profil în manifest și importurile
+   ulterioare resping altă calibrare. Consemnează pragul în `DATA.md`.
+
+4. Pentru fiecare ediție, preia ID-ul versiunii și amprenta raportului în variabilele
+   `VERSION_ID` și `REPORT_HASH`. Verifică reconcilierea și minimum 110.000 de
+   EUID-uri distincte acceptate, apoi prezintă ambele rapoarte pentru aprobarea manuală.
+   După aprobare, rulează pentru fiecare ediție:
 
    ```bash
    docker compose run --rm --no-deps etl report "$VERSION_ID"
@@ -585,7 +602,7 @@ pentru o instalare nouă și nu poate valida starea unei migrări parțiale.
 
 5. Numai după decizia manuală de publicare, preia amprenta returnată în
    `APPROVAL` și execută `etl publish "$VERSION_ID" --approval "$APPROVAL"` prin
-   același `docker compose run --rm --no-deps`. Repetă fluxul pentru `2026-11-04`.
+   același `docker compose run --rm --no-deps`, în ordine cronologică.
 6. Compară cele două ID-uri publicate prin `etl diff "$OLD_VERSION" "$NEW_VERSION"`
    și păstrează rapoartele agregate. Nu publica fișierele brute.
 7. Upgrade-ul bazei existente, dacă va fi dorit ulterior, necesită autorizare și

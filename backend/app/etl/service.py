@@ -18,10 +18,12 @@ from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
 from app.etl.parser import classify, project, records
 from app.etl.source import HEADER, LEGAL_FORMS, PROFILE_VERSION, RETAINED, SOURCES
+from app.etl.subset import SUBSET_MINIMUM, SUBSET_PROFILE, selected, validate_calibration
 
 DATASET = "onrc-firme-pj"
 FIELDS = tuple(RETAINED.values())
 QUALITY_FORMAT = 1
+SUBSET_QUALITY_FORMAT = 2
 RETRY_BATCH_SIZE = 1000
 logger = logging.getLogger(__name__)
 INGEST_DATABASE_ERRORS = (SQLAlchemyError, MySQLError)
@@ -52,6 +54,8 @@ def quality_deltas(old, new):
         "quarantined_records",
         "duplicate_key_records",
     )
+    if "out_of_subset_records" in old and "out_of_subset_records" in new:
+        metrics += ("out_of_subset_records",)
     counts = {
         metric: count_delta(old[metric], new[metric]) for metric in ("source_records", *metrics)
     }
@@ -189,7 +193,7 @@ def ingest_transaction(connection, lock_name, *, terminal=False):
             log_ingest_operation(logging.DEBUG, phase, "completed", started_at)
 
 
-def lock_publication_pointer(connection):
+def lock_publication_pointer(connection, *, exclusive=False):
     # Match publish's lock order: pointer before version. Readers can share this lock.
     # Resolve the stored pointer using the foreign key's database collation.
     canonical_id = (
@@ -202,7 +206,7 @@ def lock_publication_pointer(connection):
         current_version = connection.scalar(
             select(case((publications.c.current_version_id.is_(None), ""), else_=canonical_id))
             .where(publications.c.dataset == DATASET)
-            .with_for_update(read=True)
+            .with_for_update(read=not exclusive)
         )
     if current_version is None:
         raise ETLError("retry_cleanup_not_allowed")
@@ -295,10 +299,21 @@ class Pipeline:
         self.minimum_rows = minimum_rows
         self.allow_synthetic = allow_synthetic
 
-    def ingest(self, path, source, *, transfer=None):
+    def ingest(self, path, source, *, transfer=None, calibration=None):
+        threshold = None
+        profile = PROFILE_VERSION
+        if source.kind == "real":
+            if SOURCES.get(source.edition) != source:
+                raise ETLError("source_not_approved")
+            if calibration is None:
+                raise ETLError("calibration_required")
+            threshold = validate_calibration(calibration)
+            profile = SUBSET_PROFILE
         sha256 = file_hash(path)
+        if threshold is not None and calibration["editions"][source.edition]["sha256"] != sha256:
+            raise ETLError("calibration_source_changed")
         lock_name = digest_json(
-            [self.engine.url.database, source.kind, source.resource_id, PROFILE_VERSION, sha256]
+            [self.engine.url.database, source.kind, source.resource_id, profile, sha256]
         )
         # A server-side session lock is released even if the worker process dies.
         # Holding it proves any old loading attempt for this input is abandoned.
@@ -318,7 +333,15 @@ class Pipeline:
                     raise ETLError("version_busy")
                 try:
                     return self._ingest(
-                        connection, lock_name, path, source, sha256, transfer=transfer
+                        connection,
+                        lock_name,
+                        path,
+                        source,
+                        sha256,
+                        transfer=transfer,
+                        calibration=calibration,
+                        threshold=threshold,
+                        profile=profile,
                     )
                 finally:
                     if not connection.invalidated:
@@ -335,24 +358,56 @@ class Pipeline:
             # Preserve the CLI's safe error code for callers of the pipeline itself.
             raise ETLError("database_error") from None
 
-    def _ingest(self, connection, lock_name, path, source, sha256, *, transfer=None):
+    def _ingest(
+        self,
+        connection,
+        lock_name,
+        path,
+        source,
+        sha256,
+        *,
+        transfer,
+        calibration,
+        threshold,
+        profile,
+    ):
         if source.kind not in {"real", "synthetic"}:
             raise ETLError("source_kind_invalid")
-        if source.kind == "real" and SOURCES.get(source.edition) != source:
-            raise ETLError("source_not_approved")
         if source.kind == "synthetic" and not self.allow_synthetic:
             raise ETLError("synthetic_not_allowed")
         if source.size is not None and path.stat().st_size != source.size:
             raise ETLError("source_size_changed")
         candidate, attempt_id = str(uuid4()), str(uuid4())
+        manifest = {
+            "package_id": source.package_id,
+            "resource_id": source.resource_id,
+            "edition": source.edition,
+            "url": source.url,
+            "declared_bytes": source.size,
+            "observed_bytes": path.stat().st_size,
+            "transfer": transfer or {},
+        }
+        schema_hash = SCHEMA_HASH
+        if threshold is not None:
+            manifest["subset"] = calibration
+            schema_hash = digest_json([SCHEMA_HASH, profile, calibration["rule"], threshold])
         identity = (
             versions.c.source_kind == source.kind,
             versions.c.resource_id == source.resource_id,
             versions.c.sha256 == sha256,
-            versions.c.profile == PROFILE_VERSION,
+            versions.c.profile == profile,
         )
         with ingest_transaction(connection, lock_name):
-            current_version = lock_publication_pointer(connection)
+            # Serialize the first calibration binding across the two edition-specific locks.
+            current_version = lock_publication_pointer(connection, exclusive=threshold is not None)
+            if threshold is not None:
+                frozen = connection.scalar(
+                    select(versions.c.manifest)
+                    .where(versions.c.source_kind == "real", versions.c.profile == profile)
+                    .limit(1)
+                )
+                if frozen is not None and frozen.get("subset") != calibration:
+                    raise ETLError("calibration_already_frozen")
             statement = mysql_insert(versions).values(
                 id=candidate,
                 edition=source.edition,
@@ -361,19 +416,11 @@ class Pipeline:
                 license="CC-BY-4.0",
                 source_kind=source.kind,
                 sha256=sha256,
-                profile=PROFILE_VERSION,
-                schema_hash=SCHEMA_HASH,
+                profile=profile,
+                schema_hash=schema_hash,
                 state="loading",
                 created_at=datetime.now(UTC).replace(tzinfo=None),
-                manifest={
-                    "package_id": source.package_id,
-                    "resource_id": source.resource_id,
-                    "edition": source.edition,
-                    "url": source.url,
-                    "declared_bytes": source.size,
-                    "observed_bytes": path.stat().st_size,
-                    "transfer": transfer or {},
-                },
+                manifest=manifest,
             )
             # Retain the existing operation name for the version upsert.
             with ingest_operation(connection, "prepare_attempt"):
@@ -432,9 +479,8 @@ class Pipeline:
 
         counters, reasons, nulls = Counter(), Counter(), Counter()
         source_forms = dict.fromkeys((*sorted(LEGAL_FORMS), "missing", "other"), 0)
-        # Detect duplicate identities across the entire source without persisting
-        # identifiers or personal values from excluded records. This key lives only
-        # in this worker; keyed digests and staging rows are deleted on completion.
+        # Track every occurrence of each staged identity, including excluded rows.
+        # The key lives in this worker and staging is deleted on completion.
         identity_secret = secrets.token_bytes(32)
         examples, batch = [], []
         clearing_staging = False
@@ -450,6 +496,7 @@ class Pipeline:
                 if classification == "legal_entity":
                     projected, errors = project(row)
                     counters["legal_entity_candidates"] += 1
+                    counters["valid_legal_entity_records"] += not errors
                     counters["cui_zero"] += projected["cui"] == "0"
                     nulls.update(key for key, value in projected.items() if value is None)
                 else:
@@ -458,6 +505,15 @@ class Pipeline:
                 reasons.update(errors)
                 if errors and len(examples) < 20:
                     examples.append({"source_line": ordinal, "codes": errors})
+                if threshold is not None:
+                    if not selected(row["EUID"], threshold):
+                        if not errors:
+                            counters["out_of_subset_records"] += 1
+                        elif classification != "natural_person_excluded":
+                            counters["unstaged_quarantined_records"] += 1
+                        continue
+                    if errors:
+                        projected = dict.fromkeys(FIELDS)
                 batch.append(
                     dict(
                         version_id=version_id,
@@ -524,6 +580,7 @@ class Pipeline:
                         .select_from(staging)
                         .where(scope, staging.c.valid.is_(False), staging.c.excluded.is_(False))
                     )
+                    quarantined += counters["unstaged_quarantined_records"]
                 with ingest_operation(connection, "copy_prepared_rows"):
                     connection.execute(
                         insert(companies).from_select(
@@ -551,16 +608,32 @@ class Pipeline:
                     "examples": examples,
                     "full_file_validated": True,
                     "source_kind": source.kind,
-                    "minimum_records": max(100000, self.minimum_rows)
-                    if source.kind == "real"
-                    else self.minimum_rows,
+                    "minimum_records": self.minimum_rows,
                     "filter_policy": (
                         "J+SRL/SA/SNC; no branches; unknown classification quarantined"
                     ),
-                    "schema_hash": SCHEMA_HASH,
-                    "profile": PROFILE_VERSION,
+                    "schema_hash": schema_hash,
+                    "profile": profile,
                 }
-                if report["source_records"] != accepted + quarantined + report["excluded_records"]:
+                if threshold is not None:
+                    evidence = calibration["editions"][source.edition]
+                    if any(
+                        counters[key] != evidence[key]
+                        for key in (
+                            "source_records",
+                            "legal_entity_candidates",
+                            "valid_legal_entity_records",
+                        )
+                    ):
+                        raise ETLError("calibration_counts_changed")
+                    report.update(
+                        quality_format=SUBSET_QUALITY_FORMAT,
+                        minimum_records=max(SUBSET_MINIMUM, self.minimum_rows),
+                        duplicate_key_scope="selected_euids",
+                        out_of_subset_records=counters["out_of_subset_records"],
+                    )
+                classified = accepted + quarantined + report["excluded_records"]
+                if report["source_records"] != classified + counters["out_of_subset_records"]:
                     raise ETLError("quality_totals_mismatch")
             clearing_staging = True
             clear_retry_rows(
@@ -669,7 +742,7 @@ class Pipeline:
             raise ETLError("quality_reports_incompatible")
         result = {"old_version": old["id"], "new_version": new["id"]}
         formats = {old["report"].get("quality_format"), new["report"].get("quality_format")}
-        if formats == {QUALITY_FORMAT}:
+        if formats in ({QUALITY_FORMAT}, {SUBSET_QUALITY_FORMAT}):
             return {
                 **result,
                 "comparison_status": "comparable",
@@ -690,11 +763,10 @@ class Pipeline:
             raise ETLError("synthetic_not_allowed")
         if not report or digest_json(report) != version["report_hash"]:
             raise ETLError("report_changed")
-        minimum = (
-            max(100000, report["minimum_records"])
-            if version["source_kind"] == "real"
-            else report["minimum_records"]
-        )
+        minimum = report["minimum_records"]
+        if version["source_kind"] == "real":
+            floor = SUBSET_MINIMUM if version["profile"] == SUBSET_PROFILE else 100_000
+            minimum = max(floor, minimum)
         if not report["full_file_validated"] or report["accepted_records"] < minimum:
             raise ETLError("insufficient_records")
         if verify_data:

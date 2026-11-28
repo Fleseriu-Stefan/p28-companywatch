@@ -36,11 +36,27 @@ formă juridică, județ, localitate și data înmatriculării. Profilul exclude
 persoanele fizice și carantinează cheile lipsă sau duplicate. Strada,
 celelalte detalii de adresă și câmpul WEB sunt în afara proiecției.
 
+## Subsetul reproductibil D-018
+
+Se calculează SHA-256 din octeții UTF-8 ai EUID-ului exact și se interpretează
+rezultatul ca întreg fără semn, big-endian. Sunt selectate valorile strict sub
+același prag pentru ambele ediții. Se păstrează toate aparițiile EUID-urilor
+selectate la intrarea în staging pentru a detecta duplicatele între clasificări.
+Rândurile valide din afara subsetului sunt numărate separat de carantină și de
+excluderile de politică.
+
+Calibrarea citește integral fiecare ediție în Python, cu hash-urile EUID în
+memorie. Pragul este cu o unitate peste valoarea cea mai mare dintre hash-urile
+de rang 120.000 ale EUID-urilor eligibile, valide și unice la nivelul sursei.
+Valoarea numerică a pragului rămâne de consemnat după calibrarea autorizată.
+Manifestul va conține regula, pragul hexazecimal, amprentele fișierelor integrale
+și statisticile agregate pentru ambele ediții.
+
 ## De verificat înainte de publicare
 
 - Numărul total de rânduri, calitatea întregului export și unicitatea globală
   a EUID, separat pentru fiecare ediție.
-- Minimum 100.000 de persoane juridice acceptate per ediție după validare și
+- Minimum 110.000 de persoane juridice acceptate per ediție după validare și
   carantină. Numărul de rânduri din prefix descrie doar eșantionul.
 - SHA-256 pentru fiecare fișier complet și rezultatul diff-ului real.
   Catalogul consultat nu furniza hash-ul. Hash-ul calculat la transfer va

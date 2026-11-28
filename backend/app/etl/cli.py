@@ -15,6 +15,7 @@ from app.etl.download import downloaded
 from app.etl.errors import ETLError
 from app.etl.service import Pipeline
 from app.etl.source import SOURCES
+from app.etl.subset import CALIBRATION_TARGET, build_calibration, scan_edition, validate_calibration
 
 
 def require_raw_tmpfs():
@@ -28,14 +29,37 @@ def require_raw_tmpfs():
         raise ETLError("raw_tmpfs_required")
 
 
+def read_calibration(path):
+    if path is None:
+        raise ETLError("calibration_required")
+    value = json.load(sys.stdin) if path == "-" else json.loads(Path(path).read_text())
+    validate_calibration(value)
+    return value
+
+
+def calibrate():
+    scans = {}
+    for edition, source in SOURCES.items():
+        with downloaded(source, Path("/etl-private")) as artifact:
+            scans[edition] = {
+                **scan_edition(artifact.path, target=CALIBRATION_TARGET),
+                "resource_id": source.resource_id,
+                "sha256": artifact.sha256,
+            }
+    return build_calibration(scans)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="CompanyWatch ETL (manual approval required)")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("sources")
+    calibration_command = commands.add_parser("calibrate")
+    calibration_command.add_argument("--allow-real-download", action="store_true")
     ingest = commands.add_parser("ingest")
     ingest.add_argument("--edition", choices=SOURCES, required=True)
     ingest.add_argument("--allow-real-download", action="store_true")
     ingest.add_argument("--expected-sha256")
+    ingest.add_argument("--calibration", help="calibration JSON file, or - for standard input")
     report = commands.add_parser("report")
     report.add_argument("version")
     approve = commands.add_parser("approve")
@@ -61,10 +85,10 @@ def main(argv=None):
             )
         )
         return 0
-    if args.command == "ingest" and not args.allow_real_download:
-        print("real_download_requires_explicit_consent", file=sys.stderr)
-        return 2
-    if args.command == "ingest":
+    if args.command in {"calibrate", "ingest"}:
+        if not args.allow_real_download:
+            print("real_download_requires_explicit_consent", file=sys.stderr)
+            return 2
         try:
             require_raw_tmpfs()
         except (ETLError, OSError):
@@ -72,17 +96,24 @@ def main(argv=None):
             return 2
     engine = None
     try:
+        if args.command == "calibrate":
+            print(json.dumps(calibrate(), sort_keys=True))
+            return 0
+        if args.command == "ingest":
+            calibration = read_calibration(args.calibration)
+            expected = calibration["editions"][args.edition]["sha256"]
+            if args.expected_sha256 is not None and args.expected_sha256 != expected:
+                raise ETLError("calibration_source_changed")
         engine_kwargs = {"read_timeout": 120} if args.command == "ingest" else {}
         engine = create_database_engine(Settings.from_env(), **engine_kwargs)
         pipeline = Pipeline(engine)
         if args.command == "ingest":
             source = SOURCES[args.edition]
-            with downloaded(
-                source, Path("/etl-private"), expected_sha256=args.expected_sha256
-            ) as artifact:
+            with downloaded(source, Path("/etl-private"), expected_sha256=expected) as artifact:
                 version = pipeline.ingest(
                     artifact.path,
                     source,
+                    calibration=calibration,
                     transfer={
                         "final_url": artifact.final_url,
                         "etag": artifact.etag,

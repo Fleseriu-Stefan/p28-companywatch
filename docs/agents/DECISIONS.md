@@ -23,6 +23,7 @@
 - D-015 · Main dashboard and export semantics
 - D-016 · Docker verification on every push and on pull requests
 - D-017 · Temporary delivery authorization through December 3
+- D-018 · Reproducible ONRC EUID subset
 
 ---
 
@@ -158,4 +159,13 @@
 - **Rejected:** Continue the M2.3C pilot, gate, or synthetic benchmark campaign. Carry the standing authorization past the delivery deadline.
 - **Evidence:** The project owner explicitly approved D-017 and deferred Q-013 and Q-014. [Delivery approval and scope](../../AI_LOG.md#2026-11-28--delivery-mode-approval-and-ci).
 - **Source:** Project owner · 2026-11-28.
+- **Confirmed:** 2026-11-28
+
+## D-018 · Reproducible ONRC EUID subset
+- **Status:** approved
+- **Date:** 2026-11-28
+- **Rule:** Fully parse and validate both D-006 editions. Calibrate in one streaming Python pass per raw file in protected tmpfs, with transient in-memory identity hashes and no MySQL staging. For each edition find the 120,000th smallest hash among valid legal-entity EUIDs occurring exactly once in the full source. Freeze one threshold at one above the larger of the two values. Hash the exact UTF-8 EUID with SHA-256 and select when its unsigned big-endian value is strictly below the threshold. Apply the rule before batching for staging. Keep all source occurrences of selected EUIDs for duplicate detection under D-007. Bind the calibration to both resource IDs and full checksums. Record the rule and threshold in each manifest and DATA.md. Report out-of-subset valid rows separately from invalid rows and distinguish full-source from subset duplicate counts. Require at least 110,000 accepted distinct EUIDs in each edition before manual publication.
+- **Why:** Reduce staging volume and keep membership reproducible across editions, with a 10,000-record calibration margin above the required minimum.
+- **Rejected:** County filter, because it biases geographic coverage and county changes could alter membership. First-N-rows, because it depends on source order and can split duplicate groups.
+- **Evidence:** Project owner approved D-018, the C-002 amendment, and the two-step delivery. Real calibration follows separate owner approval after Step A merges.
 - **Confirmed:** 2026-11-28

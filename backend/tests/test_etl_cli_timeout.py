@@ -30,6 +30,11 @@ def test_ingest_cli_selects_long_read_timeout_only_after_download_opt_in(monkeyp
     monkeypatch.setattr(cli, "Pipeline", lambda _: pipeline)
     monkeypatch.setattr(cli, "require_raw_tmpfs", lambda: None)
     monkeypatch.setattr(cli, "downloaded", synthetic_download)
+    monkeypatch.setattr(
+        cli,
+        "read_calibration",
+        lambda _: {"editions": {"2026-10-19": {"sha256": "synthetic-hash"}}},
+    )
 
     assert cli.main(["ingest", "--edition", "2026-10-19"]) == 2
     create_engine.assert_not_called()
