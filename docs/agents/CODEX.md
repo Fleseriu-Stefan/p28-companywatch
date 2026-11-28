@@ -38,8 +38,8 @@ Under D-017, plan one S or M delivery unit at a time. The M2.3C campaign is
 closed. Through the end of December 3 in Europe/Bucharest, the project owner
 pre-authorizes feature-branch commits and pushes, opening PRs, merging after CI
 is green for the current PR revision, full download and ingestion of the two
-D-006 editions (19.10.2026 and 04.11.2026), and deployment to the owner's Oracle
-VM. Per-action authorization resumes December 4. Preserve existing MySQL data
+D-006 editions (19.10.2026 and 04.11.2026), and deployment to Azure VM
+`companywatch-live`. Per-action authorization resumes December 4. Preserve existing MySQL data
 and follow the protected raw-data, validation, and manual publication rules in
 D-007, D-008 and C-002.
 

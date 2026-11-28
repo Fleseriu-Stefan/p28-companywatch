@@ -1,0 +1,89 @@
+name: companywatch-live
+
+x-backend: &backend
+  image: ${COMPOSE_PROJECT_NAME}-backend:m2
+  build:
+    context: ./backend
+  environment: &database-environment
+    MYSQL_HOST: db
+    MYSQL_PORT: "3306"
+    MYSQL_DATABASE: ${MYSQL_DATABASE:?Set MYSQL_DATABASE in .env.production}
+    MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env.production}
+    MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env.production}
+
+services:
+  db:
+    image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Set MYSQL_DATABASE in .env.production}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env.production}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env.production}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.production}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u \"$$MYSQL_USER\" \"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      start_period: 30s
+      retries: 30
+
+  migrate:
+    <<: *backend
+    restart: "no"
+    environment:
+      <<: *database-environment
+      M2_MIGRATION_PROJECT: ${COMPOSE_PROJECT_NAME}
+      COMPANYWATCH_M2_MIGRATE: ${COMPANYWATCH_M2_MIGRATE:-0}
+    command:
+      - sh
+      - -ec
+      - |
+        case "$$M2_MIGRATION_PROJECT" in
+          ""|companywatch)
+            echo "M2 migration requires a separate Compose project"
+            exit 2
+            ;;
+        esac
+        if [ "$$COMPANYWATCH_M2_MIGRATE" != 1 ]; then
+          echo "Set COMPANYWATCH_M2_MIGRATE=1 to migrate this M2 project"
+          exit 2
+        fi
+        exec alembic upgrade head
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=15).close()"]
+      interval: 5s
+      timeout: 16s
+      start_period: 10s
+      retries: 12
+
+  caddy:
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  mysql_data:
+  caddy_data:
+  caddy_config:

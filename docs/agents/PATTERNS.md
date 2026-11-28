@@ -9,6 +9,7 @@
 - PATTERN-001 · Isolated Compose verification · candidate
 - PATTERN-002 · Review seals for immutable ETL snapshots · candidate
 - PATTERN-003 · Bounded recovery under a session lock · candidate
+- PATTERN-004 · Restore a published snapshot database before startup · candidate
 
 ---
 
@@ -37,3 +38,8 @@ No application patterns are approved for replication.
   interruption, a new lock owner resumes from the rows still present.
 - **Example:** `backend/app/etl/service.py` and `backend/tests/test_etl_database.py`.
 - **Confirmed:** 2026-11-27
+
+## PATTERN-004 · Restore a published snapshot database before startup
+- **Status:** candidate
+- **How:** Restore the application schema, migration revision and publication pointer into an empty database before running migrations. Compare both published versions and the current pointer before and after a container recreate with the same volume.
+- **Example:** [Azure deployment procedure](../DEPLOY.md).

@@ -1,5 +1,13 @@
 # AI log
 
+## 2026-11-28 · Minimal Azure production deployment
+
+- **Tool** — Codex.
+- **What I asked** — Deploy the published local database and FastAPI behind Caddy on Azure after the PR passes CI and merges. Rehearse restore once locally and verify HTTPS and data persistence after recreating containers.
+- **What I got** — A production Compose stack, a private credential template, and commands for installation, backup, restore, update, and verification. [Deployment procedure](docs/DEPLOY.md).
+- **Verification** — The full Docker suite passed. One isolated restore reproduced 120,000 October rows, 120,163 November rows, and the November publication pointer. The rehearsal project was removed.
+- **What I did with it** — Approved the Azure target in D-017, the answers to Q-005 and Q-007, and generation of credentials in the VM's private mode-600 `.env.production`.
+
 ## 2026-11-28 · D-018 Step B local publication and benchmark
 
 - **Tool** — Codex.
