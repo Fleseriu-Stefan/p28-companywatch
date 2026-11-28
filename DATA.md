@@ -48,18 +48,44 @@ excluderile de politică.
 Calibrarea citește integral fiecare ediție în Python, cu hash-urile EUID în
 memorie. Pragul este cu o unitate peste valoarea cea mai mare dintre hash-urile
 de rang 120.000 ale EUID-urilor eligibile, valide și unice la nivelul sursei.
-Valoarea numerică a pragului rămâne de consemnat după calibrarea autorizată.
-Manifestul va conține regula, pragul hexazecimal, amprentele fișierelor integrale
+Pragul comun este `0ad50bf4b6dbdc006cb5c647df5bd26933e99ca6016ec57309909de4d26e07d2` (hexazecimal).
+[Statisticile de calibrare](docs/evidence/onrc-calibration.json) acoperă ambele ediții.
+Manifestul fiecărei versiuni conține regula, pragul hexazecimal, amprentele fișierelor integrale
 și statisticile agregate pentru ambele ediții.
 
-## De verificat înainte de publicare
+## Calitatea edițiilor publicate
 
-- Numărul total de rânduri, calitatea întregului export și unicitatea globală
-  a EUID, separat pentru fiecare ediție.
-- Minimum 110.000 de persoane juridice acceptate per ediție după validare și
-  carantină. Numărul de rânduri din prefix descrie doar eșantionul.
-- SHA-256 pentru fiecare fișier complet și rezultatul diff-ului real.
-  Catalogul consultat nu furniza hash-ul. Hash-ul calculat la transfer va
-  identifica fișierul primit.
+Ambele ediții au fost citite integral și publicate local cu profilul D-018,
+în ordine cronologică. Ediția curentă este 2026-11-04.
 
-Importul integral și publicarea datelor reale rămân în așteptare sub Q-005.
+| Indicator | 2026-10-19 | 2026-11-04 |
+|---|---:|---:|
+| Rânduri sursă | 4.229.451 | 4.233.074 |
+| Acceptate | 120.000 | 120.163 |
+| Carantinate distinct | 28.996 | 29.013 |
+| Excluse prin politică | 1.357.708 | 1.359.250 |
+| Valide în afara subsetului | 2.722.747 | 2.724.648 |
+| `branch_quarantined` | 16.894 | 16.901 |
+| `classification_unknown` | 11.705 | 11.715 |
+| `euid_duplicate` | 416 | 416 |
+| `euid_registration_mismatch` | 1 | 1 |
+
+Numărătorile pe motiv sunt neaditivi. `euid_duplicate` include toate aparițiile
+pentru EUID-urile duplicate selectate, inclusiv rânduri deja semnalate sau
+excluse prin politică. Fiecare ediție are 208 grupuri duplicate în subset;
+calibrarea a detectat 4.713 grupuri (9.426 rânduri) în fiecare sursă completă.
+
+| Ediție | Candidați persoane juridice | Județ lipsă (candidați) | Localitate lipsă (candidați) | Județ lipsă (acceptate) | Localitate lipsă (acceptate) |
+|---|---:|---:|---:|---:|---:|
+| 2026-10-19 | 2.843.144 | 144 | 159 | 7 | 7 |
+| 2026-11-04 | 2.845.208 | 144 | 159 | 7 | 7 |
+
+## Diff SQL real · octombrie → noiembrie
+
+913 adăugate, 750 eliminate, 20 modificate și 119.230 neschimbate.
+Modificări pe câmp: denumire 2, județ 6, localitate 18, CUI 0, număr de
+înmatriculare 0, formă juridică 0, dată de înmatriculare 0.
+
+După încălzire, timpii SQL au fost 1,624 s, 1,679 s și 1,690 s, fiecare sub
+ținta de 30 s. Consumul complet în Python a durat 1,625 s, 1,681 s și 1,692 s.
+[Rezultatele Q-010 și planul de execuție](docs/M2.1-BENCHMARK.md#rezultate-q-010--2026-10-19--2026-11-04).

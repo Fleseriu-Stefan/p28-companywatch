@@ -1,0 +1,22 @@
+{
+  "target": 120000,
+  "threshold": "0ad50bf4b6dbdc006cb5c647df5bd26933e99ca6016ec57309909de4d26e07d2",
+  "editions": {
+    "2026-10-19": {
+      "duplicate_key_groups": 4713,
+      "duplicate_key_records": 9426,
+      "eligible_singletons": 2834205,
+      "legal_entity_candidates": 2843144,
+      "source_records": 4229451,
+      "valid_legal_entity_records": 2843143
+    },
+    "2026-11-04": {
+      "duplicate_key_groups": 4713,
+      "duplicate_key_records": 9426,
+      "eligible_singletons": 2836269,
+      "legal_entity_candidates": 2845208,
+      "source_records": 4233074,
+      "valid_legal_entity_records": 2845207
+    }
+  }
+}

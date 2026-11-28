@@ -1,5 +1,19 @@
 # AI log
 
+## 2026-11-28 · D-018 Step B local publication and benchmark
+
+- **Tool** — Codex.
+- **What I asked** — Calibrate and ingest both real ONRC editions locally, present their quality reports, and wait for approval. After approval, publish October before November and run the Q-010 benchmark.
+- **What I got** — The same source-bound calibration was applied to both editions. The local volume holds 120,000 accepted October EUIDs and 120,163 accepted November EUIDs. The repository calibration evidence contains counts and the threshold. The complete SQL diff met the 30-second target in all three measured runs.
+- **What I did with it** — Approved both reports for publication. October was published first, and November is current. The aggregate quality evidence and reproducible benchmark were prepared for review. [Data and quality](DATA.md) · [Benchmark](docs/M2.1-BENCHMARK.md#rezultate-q-010--2026-10-19--2026-11-04).
+
+## 2026-11-28 · D-018 Step A implementation
+
+- **Tool** — Codex.
+- **What I asked** — Implement Step A of the approved D-018 plan: calibrate one reproducible EUID threshold, apply it before staging, retain duplicate detection across classifications, and report out-of-subset rows separately.
+- **What I got** — The `calibrate` command, source-bound calibration and subset ingestion with a 110,000 accepted-EUID minimum per edition, plus synthetic tests and updated ETL documentation.
+- **What I did with it** — Approved D-018 and the C-002 amendment. Step A shipped in `6f2a26a` through [PR #11](https://github.com/Fleseriu-Stefan/p28-companywatch/pull/11), which merged as `e7ac097` after CI passed. Real calibration and ingestion were reserved for Step B.
+
 ## 2026-11-28 · Delivery mode approval and CI
 
 - **Tool (Codex, prompt)** — Codex. “Approve both proposals: D-016 (CI on every push and on pull requests, supersedes D-004) and D-017 (temporary delivery authorization through Dec 3).”
