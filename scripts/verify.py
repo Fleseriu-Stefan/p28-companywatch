@@ -10,6 +10,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from textwrap import dedent
 
 ROOT = Path(__file__).resolve().parent.parent
 LEGACY_PROJECT = "companywatch"
@@ -162,6 +163,125 @@ def verify_db_mount(compose, project, volume, *, required=True):
     print(f"Verified live MySQL mount {volume}", flush=True)
 
 
+def verify_proxy(compose):
+    production = json.loads(
+        compose(
+            "config",
+            "--format",
+            "json",
+            capture=True,
+            extra_file=ROOT / "compose.prod.yaml",
+        ).stdout
+    )
+    services = production["services"]
+    caddy = services["caddy"]
+    with tempfile.TemporaryDirectory(prefix="companywatch-proxy-") as temp:
+        config = Path(temp) / "Caddyfile"
+        deployed = (ROOT / "deploy/Caddyfile").read_text()
+        config.write_text(":8080 {\n" + deployed.split("\n", 1)[1])
+        override = Path(temp) / "proxy.yaml"
+        override.write_text(
+            json.dumps(
+                {
+                    "services": {
+                        "api": {
+                            "command": services["api"]["command"],
+                            "networks": ["default", "ingress"],
+                        },
+                        "caddy": {
+                            "image": caddy["image"],
+                            "volumes": [f"{config}:/etc/caddy/Caddyfile:ro"],
+                            "networks": caddy["networks"],
+                        },
+                        "tests": {"networks": ["default", "ingress"]},
+                    },
+                    "networks": {"ingress": {"ipam": production["networks"]["ingress"]["ipam"]}},
+                }
+            )
+        )
+        path = "/api/web/v1/versions"
+        try:
+            compose(
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "180",
+                "api",
+                "caddy",
+                extra_file=override,
+            )
+            peer = compose(
+                "run",
+                "--rm",
+                "--no-deps",
+                "tests",
+                "python",
+                "-c",
+                dedent("""
+                    import socket
+                    import sys
+                    import time
+                    import urllib.error
+                    import urllib.request
+                    from datetime import UTC, datetime
+
+                    for attempt in range(10):
+                        try:
+                            with socket.create_connection(("caddy", 8080), timeout=2) as sock:
+                                print(sock.getsockname()[0])
+                            break
+                        except OSError:
+                            if attempt == 9:
+                                raise
+                            time.sleep(1)
+                    second = datetime.now(UTC).second
+                    if second >= 50:
+                        time.sleep(61 - second)
+                    url = "http://caddy:8080" + sys.argv[1]
+                    for count in range(121):
+                        headers = {"X-Forwarded-For": f"192.0.2.{count + 1}"}
+                        request = urllib.request.Request(url, headers=headers)
+                        try:
+                            with urllib.request.urlopen(request, timeout=10) as response:
+                                assert response.status == 200 and count < 120
+                        except urllib.error.HTTPError as error:
+                            assert count == 120 and error.code == 429
+                            assert error.headers["Retry-After"]
+                """),
+                path,
+                extra_file=override,
+                capture=True,
+            ).stdout.strip()
+            compose(
+                "exec",
+                "-T",
+                "api",
+                "python",
+                "-c",
+                dedent("""
+                    import sys
+                    import urllib.request
+
+                    proxied, direct, peer = sys.argv[1:]
+                    for url in (proxied, direct):
+                        request = urllib.request.Request(url, headers={"X-Forwarded-For": peer})
+                        with urllib.request.urlopen(request, timeout=10) as response:
+                            assert response.status == 200
+                """),
+                "http://caddy:8080" + path,
+                "http://127.0.0.1:8000" + path,
+                peer,
+                extra_file=override,
+            )
+            print(
+                "Caddy client IP, isolated peer buckets and direct-header rejection: OK",
+                flush=True,
+            )
+        finally:
+            compose("down", "--timeout", "5", extra_file=override)
+
+
 def main() -> None:
     subprocess.run([sys.executable, "docs/agents/tools/ledger-lint.py"], cwd=ROOT, check=True)
     check_git_exclusions()
@@ -256,6 +376,8 @@ def main() -> None:
         assert (
             "ADD INDEX ix_company_version_name" in offline and "0003_public_api_indexes" in offline
         )
+        for table in ("users", "api_keys", "api_usage"):
+            assert f"CREATE TABLE {table}" in offline and "0004_auth_access" in offline
         for subcommand in ("sources", "--help"):
             compose("run", "--rm", "etl", subcommand)
             assert not compose("ps", "-a", "-q", "db", "migrate", capture=True).stdout.strip()
@@ -359,11 +481,12 @@ def main() -> None:
             "engine = create_database_engine(Settings.from_env()); "
             "connection = engine.connect(); "
             "assert MigrationContext.configure(connection).get_current_heads() "
-            "== ('0003_public_api_indexes',); connection.close(); engine.dispose()",
+            "== ('0004_auth_access',); connection.close(); engine.dispose()",
         )
         compose("up", "-d", "--wait", "--wait-timeout", "180", "api")
         await_ready(api_url())
-        print("M1/M2 verification passed", flush=True)
+        verify_proxy(compose)
+        print("CompanyWatch verification passed", flush=True)
     except IsolationError:
         allow_cleanup = False
         raise

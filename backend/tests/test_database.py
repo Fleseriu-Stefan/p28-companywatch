@@ -26,13 +26,12 @@ def test_baseline_and_repeated_migration(engine):
         connection.execute(text("INSERT INTO m1_upgrade_marker VALUES (1, 42)"))
     check_partial_migration_recovery(engine, config)
     check_company_index_migration(engine, config)
+    check_auth_migration(engine, config)
     command.upgrade(config, "head")
     command.upgrade(config, "head")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT value FROM m1_upgrade_marker WHERE id=1")) == 42
-        assert MigrationContext.configure(connection).get_current_heads() == (
-            "0003_public_api_indexes",
-        )
+        assert MigrationContext.configure(connection).get_current_heads() == ("0004_auth_access",)
     assert is_database_ready(engine)
 
 
@@ -112,6 +111,51 @@ def check_company_index_migration(engine, config):
     }
     with engine.connect() as connection:
         assert MigrationContext.configure(connection).get_current_heads() == ("0002_etl",)
+
+
+def check_auth_migration(engine, config):
+    command.upgrade(config, "0003_public_api_indexes")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO etl_versions "
+                "(id, edition, resource_id, source_url, license, source_kind, sha256, profile, "
+                "schema_hash, state, created_at, manifest) VALUES "
+                "('upgrade-test', '2026-11-04', 'fixture', 'https://example.test', "
+                "'CC-BY', 'real', "
+                "REPEAT('0',64), 'test', REPEAT('1',64), 'published', NOW(), JSON_OBJECT())"
+            )
+        )
+        connection.execute(
+            text(
+                "UPDATE dataset_publications SET current_version_id = 'upgrade-test' "
+                "WHERE dataset = 'onrc-firme-pj'"
+            )
+        )
+
+    def interrupt(connection, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().startswith("CREATE TABLE api_usage"):
+            raise RuntimeError("synthetic_auth_migration_interruption")
+
+    event.listen(Engine, "before_cursor_execute", interrupt)
+    try:
+        with pytest.raises(RuntimeError, match="synthetic_auth_migration_interruption"):
+            command.upgrade(config, "head")
+    finally:
+        event.remove(Engine, "before_cursor_execute", interrupt)
+    assert {"users", "api_keys"} <= set(inspect(engine).get_table_names())
+    assert "api_usage" not in inspect(engine).get_table_names()
+    command.upgrade(config, "head")
+    with engine.begin() as connection:
+        pointer = connection.scalar(
+            text(
+                "SELECT current_version_id FROM dataset_publications "
+                "WHERE dataset = 'onrc-firme-pj'"
+            )
+        )
+        assert pointer == "upgrade-test"
+        connection.execute(text("UPDATE dataset_publications SET current_version_id = NULL"))
+        connection.execute(text("DELETE FROM etl_versions WHERE id = 'upgrade-test'"))
 
 
 def test_real_mysql_readiness_and_schema_mismatch(engine):

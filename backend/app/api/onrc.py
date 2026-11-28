@@ -30,7 +30,6 @@ from app.etl.service import Pipeline, digest_json
 
 ETAG_HEADER = {"ETag": {"schema": {"type": "string"}, "description": "Response validator."}}
 router = APIRouter(
-    prefix="/api/v1",
     tags=["Published ONRC data"],
     responses={
         200: {"headers": ETAG_HEADER},
@@ -95,9 +94,10 @@ def read_connection(request: Request):
 Database = Annotated[Connection, Depends(read_connection)]
 
 
-def conditional(response, if_none_match, body, current=None):
+def conditional(request, response, if_none_match, body, current=None):
     tag = f'W/"{digest_json([current, body.model_dump(mode="json")])}"'
-    headers = {"ETag": tag, "Cache-Control": "no-cache"}
+    cache = "private, no-cache" if getattr(request.state, "external_api", False) else "no-cache"
+    headers = {"ETag": tag, "Cache-Control": cache}
     supplied = if_none_match or ""
     if supplied.strip() == "*" or any(
         value.removeprefix("W/") == tag.removeprefix("W/") for value in ENTITY_TAG.findall(supplied)
@@ -108,7 +108,9 @@ def conditional(response, if_none_match, body, current=None):
 
 
 @router.get("/versions", response_model=VersionsResponse)
-def list_versions(database: Database, response: Response, if_none_match: IfNoneMatch = None):
+def list_versions(
+    request: Request, database: Database, response: Response, if_none_match: IfNoneMatch = None
+):
     """List the available ONRC editions and identify the current one."""
     current = queries.current_version_id(database)
     items = [
@@ -121,11 +123,12 @@ def list_versions(database: Database, response: Response, if_none_match: IfNoneM
         )
         for version in queries.published_versions(database)
     ]
-    return conditional(response, if_none_match, VersionsResponse(items=items), current)
+    return conditional(request, response, if_none_match, VersionsResponse(items=items), current)
 
 
 @router.get("/companies", response_model=CompanyPage)
 def list_companies(
+    request: Request,
     database: Database,
     response: Response,
     query: Annotated[SearchParams, Query()],
@@ -154,11 +157,12 @@ def list_companies(
         items=[Company.model_validate(item) for item in page],
         next_cursor=next_cursor,
     )
-    return conditional(response, if_none_match, body, current)
+    return conditional(request, response, if_none_match, body, current)
 
 
 @router.get("/companies/{euid:path}", response_model=ObservedCompany)
 def company_history(
+    request: Request,
     database: Database,
     response: Response,
     euid: Annotated[str, Path(min_length=1, max_length=255)],
@@ -189,7 +193,7 @@ def company_history(
             valid_to=queries.next_edition(database, version["edition"]),
             company=Company.model_validate(row) if row else None,
         )
-    return conditional(response, if_none_match, body, current)
+    return conditional(request, response, if_none_match, body, current)
 
 
 @router.get("/versions/{a}/diff/{b}", response_model=DiffPage)
@@ -234,11 +238,12 @@ def version_diff(
         items=[DiffRow.model_validate(row) for row in page],
         next_cursor=next_cursor,
     )
-    return conditional(response, if_none_match, body)
+    return conditional(request, response, if_none_match, body)
 
 
 @router.get("/aggregates", response_model=AggregatesResponse)
 def aggregates(
+    request: Request,
     database: Database,
     response: Response,
     version: Annotated[
@@ -274,4 +279,4 @@ def aggregates(
         average_quarantine_rate=average,
     )
     current = None if requested else queries.current_version_id(database)
-    return conditional(response, if_none_match, body, current)
+    return conditional(request, response, if_none_match, body, current)

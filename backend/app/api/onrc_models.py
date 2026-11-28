@@ -1,7 +1,10 @@
+import re
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.etl.parser import parse_registration_date
 
 ChangeType = Literal["added", "removed", "modified", "unchanged"]
 
@@ -40,7 +43,17 @@ class Company(BaseModel):
     legal_form: str | None
     county: str | None
     locality: str | None
-    registration_date: str | None = Field(description="Registration date as retained from ONRC.")
+    registration_date: date | None = Field(description="Registration date in ISO calendar format.")
+
+    @field_validator("cui")
+    @classmethod
+    def positive_cui(cls, value):
+        return value if value and re.fullmatch(r"[0-9]*[1-9][0-9]*", value) else None
+
+    @field_validator("registration_date", mode="before")
+    @classmethod
+    def iso_registration_date(cls, value):
+        return parse_registration_date(value) if isinstance(value, str) else value
 
 
 class CompanyPage(BaseModel):

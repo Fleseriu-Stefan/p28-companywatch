@@ -10,7 +10,7 @@ M1 implements the technical foundation selected in D-003–D-005.
 The frontend has build tooling and a React entry rendering null; it has no visual UI.
 The backend exposes health and OpenAPI under C-001. M2 adds a Docker CLI and
 minimal legal-entity ETL snapshots under C-002. The public visitor API exposes
-published version, company, history, diff and aggregate reads under C-003.
+published version, company, history, diff and aggregate reads under C-003. C-004 defines operator sessions and the two read mounts.
 Q-004 records the approved Draft 1 design for future UI implementation. Q-005
 records validation and publication of both ONRC editions in the local database.
 
@@ -50,7 +50,7 @@ M1 established the Docker startup order and the FastAPI health routes. Liveness
 checks the API process. Readiness queries MySQL and compares the current Alembic
 revision with the application's heads. The original M1 revision is
 `0001_baseline`. M2 adds `0002_etl`, and the visitor API adds search indexes
-in `0003_public_api_indexes`. The React entry
+in `0003_public_api_indexes`. Authentication and key usage storage are added by `0004_auth_access`. The React entry
 point renders no dashboard and does not consume the API.
 [Health contract C-001](CONTRACTS.md#c-001--health-and-api-documentation)
 
@@ -88,6 +88,7 @@ The local Step B database contains both published editions under D-018.
 | `etl_staging_rows` | Temporary batches for validation and duplicate detection |
 | `company_version_rows` | The eight retained fields in versioned legal-entity snapshots |
 | `dataset_publications` | Current snapshot pointer |
+| `users`, `api_keys`, `api_usage` | Operator accounts, key digests and current UTC request counters |
 
 The original M1 database uses `companywatch_mysql_data` in project
 `companywatch`. The M2 default project uses `companywatch-m2_mysql_data`.
@@ -117,6 +118,9 @@ are pinned by digest; Python and npm dependencies are locked. The tests and
 frontend build are optional Compose tools, not additional public servers.
 See ../../README.md for executable commands. CI uses the same verification script.
 Production uses `compose.prod.yaml` with Caddy as the HTTPS entry point.
+Only Caddy's fixed address on the dedicated ingress network is trusted by Uvicorn
+for forwarded client identity. The API runs one worker with in-memory signed
+sessions and dashboard rate counters. External limits persist in MySQL.
 See [the Azure deployment procedure](../DEPLOY.md). No new Python dependency
 was introduced for M2: HTTPX, SQLAlchemy and the standard library are reused.
 
@@ -125,5 +129,8 @@ The API owns C-001 in CONTRACTS.md. Consumers are the Compose healthcheck, tests
 and verification script. C-002 describes ETL consumers and published-snapshot
 semantics. [C-003](CONTRACTS.md#c-003--public-onrc-visitor-api) defines the visitor
 API. Its queries use the published tables directly and share SQL diff logic with
-the ETL CLI. No React consumer is wired yet.
+the ETL CLI. The [access contract C-004](CONTRACTS.md#c-004--operator-sessions-and-api-access)
+defines the external-key and dashboard mounts and the operator routes. Curator
+approval and publication call the same `Pipeline` methods as the ETL CLI. No
+React consumer is wired yet.
 See ../M2-ETL.md for the ingestion and publication procedure.

@@ -57,6 +57,10 @@ services:
 
   api:
     <<: *backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "172.31.250.2", "--no-access-log"]
+    networks:
+      default:
+      ingress:
     restart: unless-stopped
     depends_on:
       migrate:
@@ -74,6 +78,9 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    networks:
+      ingress:
+        ipv4_address: 172.31.250.2
     ports:
       - "80:80"
       - "443:443"
@@ -87,3 +94,10 @@ volumes:
   mysql_data:
   caddy_data:
   caddy_config:
+
+networks:
+  ingress:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/29
+          ip_range: 172.31.250.4/30

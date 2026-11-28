@@ -1,7 +1,9 @@
 companywatch-sf.austriaeast.cloudapp.azure.com {
 	@backend path /api /api/* /health /health/* /docs /docs/* /openapi.json
 	handle @backend {
-		reverse_proxy api:8000
+		reverse_proxy api:8000 {
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 
 	handle {

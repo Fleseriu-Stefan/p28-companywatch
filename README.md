@@ -137,6 +137,15 @@ React randă `null`: nu există componente demonstrative, CSS, grafice sau pagin
 Serviciul este o unealtă de build și nu expune un server web. Artefactele build-ului
 din acest container temporar nu sunt publicate sau exportate pe host.
 
+## Acces la API
+
+Dashboardul poate folosi `/api/web/v1` fără cheie. Clienții externi folosesc
+aceleași operații de citire sub `/api/v1` și trimit cheia în `X-API-Key`.
+Swagger UI la `/docs` permite autorizarea cu o cheie. Pentru conturile de
+administrator și curator, sesiunea este disponibilă prin HTTPS. Vezi
+[contractul C-004](docs/agents/CONTRACTS.md#c-004--operator-sessions-and-api-access)
+și [procedura de bootstrap](docs/DEPLOY.md#6-bootstrap-the-first-administrator).
+
 ## Migrări
 
 ```bash

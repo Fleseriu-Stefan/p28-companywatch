@@ -147,3 +147,60 @@ def test_sessions_and_password_redaction(engine, auth, caplog, monkeypatch):
     now = datetime.now(UTC) + timedelta(hours=8, seconds=1)
     monkeypatch.setattr(sessions, "utc_now", lambda: now)
     assert admin.get(ME).status_code == 401
+
+
+@pytest.mark.integration
+def test_curator_review_and_stale_approval_preserve_pointer(engine, auth):
+    from app.etl.models import publications, versions
+    from app.etl.service import DATASET, digest_json
+
+    _, _, curator, password = auth
+    version = str(uuid4())
+    report = {"full_file_validated": True, "accepted_records": 100_000, "minimum_records": 100_000}
+    report_hash = digest_json(report)
+    pointer = publications.select().where(publications.c.dataset == DATASET)
+    with engine.begin() as connection:
+        previous = connection.execute(pointer).one().current_version_id
+        connection.execute(
+            versions.insert().values(
+                id=version,
+                edition="2026-11-04",
+                state="review",
+                source_kind="real",
+                resource_id=version,
+                source_url="https://example.test",
+                license="CC-BY",
+                sha256="0" * 64,
+                schema_hash="1" * 64,
+                profile="fixture",
+                manifest={},
+                report=report,
+                report_hash=report_hash,
+                created_at=datetime.now(UTC),
+            )
+        )
+    try:
+        with TestClient(create_app(engine), base_url=BASE_URL, client=PEER) as client:
+            assert (
+                client.post(
+                    LOGIN, json={"email": curator["email"], "password": password}
+                ).status_code
+                == 200
+            )
+            listed = client.get(REVIEW).json()["items"]
+            assert any(row["id"] == version and row["report_hash"] == report_hash for row in listed)
+            assert next(row for row in listed if row["id"] == version)["report"] == report
+            assert client.post(f"{REVIEW}/{version}/publish").status_code == 409
+            assert (
+                client.post(
+                    f"{REVIEW}/{version}/approve", json={"report_hash": "0" * 64}
+                ).status_code
+                == 409
+            )
+        with engine.connect() as connection:
+            assert connection.execute(pointer).one().current_version_id == previous
+            row = connection.execute(versions.select().where(versions.c.id == version)).one()
+            assert row.state == "review" and row.approval is None
+    finally:
+        with engine.begin() as connection:
+            connection.execute(versions.delete().where(versions.c.id == version))

@@ -62,6 +62,7 @@ Ambele ediții au fost citite integral și publicate local cu profilul D-018,
 |---|---:|---:|
 | Rânduri sursă | 4.229.451 | 4.233.074 |
 | Acceptate | 120.000 | 120.163 |
+| CUI lipsă sau invalid (acceptate) | 1.284 | 1.284 |
 | Carantinate distinct | 28.996 | 29.013 |
 | Excluse prin politică | 1.357.708 | 1.359.250 |
 | Valide în afara subsetului | 2.722.747 | 2.724.648 |
@@ -79,6 +80,26 @@ calibrarea a detectat 4.713 grupuri (9.426 rânduri) în fiecare sursă complet�
 |---|---:|---:|---:|---:|---:|
 | 2026-10-19 | 2.843.144 | 144 | 159 | 7 | 7 |
 | 2026-11-04 | 2.845.208 | 144 | 159 | 7 | 7 |
+
+Numărătoarea CUI acoperă versiunile publicate
+`0b8328dd-b952-4f8d-bcf5-6473234be54a` (octombrie) și
+`ed5fdad9-ef2f-4aea-8f19-80fd4bcad744` (noiembrie). Un CUI valid conține
+exclusiv cifre ASCII și are cel puțin o cifră diferită de zero. Valorile lipsă
+sau invalide apar ca `null` în API.
+
+```sql
+SELECT v.edition, v.id, COUNT(*) AS accepted,
+       SUM(CASE WHEN r.cui IS NULL
+                     OR REGEXP_LIKE(r.cui, '[^0-9]', 'c')
+                     OR NOT REGEXP_LIKE(r.cui, '[1-9]', 'c')
+                THEN 1 ELSE 0 END) AS missing_or_invalid_cui
+FROM etl_versions v JOIN company_version_rows r ON r.version_id = v.id
+WHERE v.state = 'published' AND v.source_kind = 'real'
+  AND v.id IN ('0b8328dd-b952-4f8d-bcf5-6473234be54a',
+               'ed5fdad9-ef2f-4aea-8f19-80fd4bcad744')
+GROUP BY v.edition, v.id
+ORDER BY v.edition, v.id;
+```
 
 ## Diff SQL real · octombrie → noiembrie
 
