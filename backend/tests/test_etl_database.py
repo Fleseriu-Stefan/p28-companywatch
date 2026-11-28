@@ -12,6 +12,7 @@ from sqlalchemy import event, func, insert, select, text, update
 from sqlalchemy.exc import OperationalError
 
 from app.db import create_database_engine
+from app.etl import subset
 from app.etl.errors import ETLError
 from app.etl.models import attempts, companies, publications, staging, versions
 from app.etl.service import PROFILE_VERSION, Pipeline, clear_retry_rows, digest_json, file_hash
@@ -39,6 +40,69 @@ def publish(pipeline, version):
     approval = pipeline.approve(version, report["report_hash"])
     pipeline.publish(version, approval)
     return approval
+
+
+def test_real_subset_stages_only_selected_occurrences_and_freezes_manifest(
+    pipeline, tmp_path, monkeypatch
+):
+    duplicate, accepted, outside, invalid = sorted(
+        range(1, 5), key=lambda number: subset.euid_hash(row(number)["EUID"])
+    )
+    items = [
+        row(duplicate),
+        row(duplicate, FORMA_JURIDICA="PFA", COD_INMATRICULARE="F01/1/2020"),
+        row(accepted),
+        row(outside),
+        row(invalid, DATA_INMATRICULARE="invalid"),
+        row(5, EUID=""),
+    ]
+    monkeypatch.setattr(subset, "CALIBRATION_TARGET", 1)
+    artifacts, scans = {}, {}
+    for edition, ordered in zip(subset.SOURCES, (items, reversed(items)), strict=True):
+        path = csv_file(tmp_path / edition, ordered)
+        approved = replace(source(edition), kind="real")
+        monkeypatch.setitem(subset.SOURCES, edition, approved)
+        artifacts[edition] = path, approved
+        scans[edition] = {
+            **subset.scan_edition(path, target=1),
+            "resource_id": approved.resource_id,
+            "sha256": file_hash(path),
+        }
+    calibration = subset.build_calibration(scans)
+    stage = pipeline._stage
+    staged_lines = []
+
+    def capture_stage(connection, lock_name, batch):
+        staged_lines.extend(item["source_line"] for item in batch)
+        stage(connection, lock_name, batch)
+
+    monkeypatch.setattr(pipeline, "_stage", capture_stage)
+    path, approved = artifacts["2026-10-19"]
+    with pytest.raises(ETLError, match="^calibration_required$"):
+        pipeline.ingest(path, approved)
+    with pytest.raises(ETLError, match="^calibration_source_changed$"):
+        pipeline.ingest(artifacts["2026-11-04"][0], approved, calibration=calibration)
+    old = pipeline.ingest(path, approved, calibration=calibration)
+    assert staged_lines == [2, 3, 4]
+    version = pipeline.report(old)
+    assert version["profile"] != PROFILE_VERSION
+    assert version["manifest"]["subset"]["threshold"] == calibration["threshold"]
+    assert version["report"]["source_records"] == 6
+    assert version["report"]["accepted_records"] == 1
+    assert version["report"]["excluded_records"] == 1
+    assert version["report"]["out_of_subset_records"] == 1
+    assert version["report"]["quarantined_records"] == 3
+    assert version["report"]["duplicate_key_records"] == 2
+    assert version["report"]["duplicate_key_scope"] == "selected_euids"
+    assert pipeline.ingest(path, approved, calibration=calibration) == old
+
+    other_editions = {key: dict(scan) for key, scan in scans.items()}
+    other_editions["2026-11-04"]["sha256"] = "0" * 64
+    with pytest.raises(ETLError, match="^calibration_already_frozen$"):
+        pipeline.ingest(path, approved, calibration=subset.build_calibration(other_editions))
+    new = pipeline.ingest(*artifacts["2026-11-04"], calibration=calibration)
+    comparison = pipeline.quality_compare(old, new)
+    assert comparison["counts"]["out_of_subset_records"] == {"old": 1, "new": 1, "delta": 0}
 
 
 def test_filter_duplicates_minimal_persistence_and_idempotency(pipeline, tmp_path):
