@@ -1,4 +1,6 @@
 from datetime import UTC, datetime
+from hashlib import sha256
+from secrets import token_urlsafe
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -6,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, insert, select, update
 
+from app.auth.models import api_keys, users
 from app.etl.models import companies, publications, versions
 from app.etl.service import DATASET
 from app.main import create_app
@@ -20,8 +23,29 @@ def published_data(engine):
     """Use fictional rows in the isolated MySQL project."""
     ids = sorted((str(uuid4()) for _ in range(3)), reverse=True)
     pointer = publications.c.dataset == DATASET
+    owner_id = str(uuid4())
+    key = token_urlsafe(32)
     with engine.begin() as connection:
         previous = connection.scalar(select(publications.c.current_version_id).where(pointer))
+        connection.execute(
+            insert(users).values(
+                id=owner_id,
+                email=f"{owner_id}@example.test",
+                password_hash="unused",
+                role="curator",
+                active=True,
+            )
+        )
+        connection.execute(
+            insert(api_keys).values(
+                id=str(uuid4()),
+                owner_id=owner_id,
+                name="fixture",
+                key_prefix=key[:12],
+                key_hash=sha256(key.encode()).digest(),
+                daily_quota=5000,
+            )
+        )
         for version, edition, state, report in zip(
             ids,
             (OCTOBER, NOVEMBER, "2026-12-01"),
@@ -95,7 +119,9 @@ def published_data(engine):
             )
         connection.execute(update(publications).where(pointer).values(current_version_id=ids[0]))
     try:
-        with TestClient(create_app(engine)) as client:
+        with TestClient(
+            create_app(engine), headers={"X-API-Key": key}, client=("192.0.2.1", 1000)
+        ) as client:
             yield client, ids
     finally:
         with engine.begin() as connection:
@@ -104,6 +130,7 @@ def published_data(engine):
             )
             connection.execute(delete(companies).where(companies.c.version_id.in_(ids)))
             connection.execute(delete(versions).where(versions.c.id.in_(ids)))
+            connection.execute(delete(users).where(users.c.id == owner_id))
 
 
 def publish(engine, version):
@@ -319,3 +346,43 @@ def test_openapi_documents_public_routes():
         assert "304" in operation["responses"]
         assert "If-None-Match" in {p["name"] for p in operation["parameters"]}
         assert "$ref" in operation["responses"]["200"]["content"]["application/json"]["schema"]
+
+
+@pytest.mark.integration
+def test_normalized_company_values_on_both_mounts(published_data, engine):
+    client, (old, new, _) = published_data
+    publish(engine, new)
+    with engine.begin() as connection:
+        bad_values = (("ROONRC.A", old, "0"), ("ROONRC.A", new, "-9"), ("ROONRC.B", old, "bad"))
+        for euid, version, cui in bad_values:
+            connection.execute(
+                update(companies)
+                .where(companies.c.euid == euid, companies.c.version_id == version)
+                .values(cui=cui)
+            )
+
+    for suffix, params in (
+        ("/companies", {"version": old, "sort": "registration_date"}),
+        ("/companies/ROONRC.A", {"as_of": OCTOBER}),
+        (f"/versions/{old}/diff/{new}", {"change_type": "modified"}),
+    ):
+        external = client.get(PREFIX + suffix, params=params)
+        web = client.get("/api/web/v1" + suffix, params=params)
+        assert external.status_code == web.status_code == 200
+        assert external.json() == web.json()
+        assert external.headers["cache-control"] == "private, no-cache"
+        assert web.headers["cache-control"] == "no-cache"
+        body = external.json()
+        if suffix == "/companies":
+            first, second = body["items"][:2]
+            assert first["cui"] is None
+            assert first["registration_date"] == second["registration_date"] == "2021-12-01"
+        elif suffix.startswith("/companies/"):
+            assert body["company"]["cui"] is None
+            assert body["company"]["registration_date"] == "2022-01-31"
+        else:
+            first = body["items"][0]
+            assert "cui" in first["changed_fields"]
+            for side in ("previous", "current"):
+                assert first[side]["cui"] is None
+                assert first[side]["registration_date"] == "2022-01-31"

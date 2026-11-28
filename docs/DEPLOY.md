@@ -153,3 +153,98 @@ git pull --ff-only origin main
 prod pull db caddy
 prod up -d --build --force-recreate --wait --wait-timeout 180
 ```
+
+### 5.1 Apply the authentication release
+
+Run the block on the VM in Bash as `azureuser`, with the verified merge SHA as
+the script's only argument. Pause ingestion and publication during the update.
+The Azure API and Caddy use a dedicated ingress network. Check the VM has no
+overlapping network before creating it. Keep the dump in the mode-700 backup
+directory and preserve the existing volumes.
+
+```bash
+set -euo pipefail
+umask 077
+
+expected_sha=${1:?Pass the verified merge SHA}
+cd "$HOME/companywatch"
+test "$(git branch --show-current)" = main
+test -z "$(git status --porcelain)"
+git fetch origin main
+test "$(git rev-parse FETCH_HEAD)" = "$expected_sha"
+
+prod() {
+  sudo docker compose --env-file .env.production \
+    -f compose.prod.yaml -p companywatch-live "$@"
+}
+
+snapshot_state() {
+  prod exec -T db sh -ec \
+    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -N -B "$MYSQL_DATABASE"' <<'SQL'
+SELECT v.edition, v.id, COUNT(r.version_id)
+FROM etl_versions v LEFT JOIN company_version_rows r ON r.version_id = v.id
+WHERE v.state = 'published'
+GROUP BY v.edition, v.id ORDER BY v.edition, v.id;
+SELECT v.edition, v.id
+FROM dataset_publications p JOIN etl_versions v ON v.id = p.current_version_id;
+SQL
+}
+
+before=$(snapshot_state)
+expected=$(printf '%s\t%s\t%s\n%s\t%s\t%s\n%s\t%s\n' \
+  2026-10-19 0b8328dd-b952-4f8d-bcf5-6473234be54a 120000 \
+  2026-11-04 ed5fdad9-ef2f-4aea-8f19-80fd4bcad744 120163 \
+  2026-11-04 ed5fdad9-ef2f-4aea-8f19-80fd4bcad744)
+test "$before" = "$expected"
+
+backup_dir="$HOME/.local/share/companywatch-backups"
+install -d -m 700 "$backup_dir"
+backup=$(mktemp --suffix=.sql.gz.part \
+  "$backup_dir/companywatch-$(date -u +%Y%m%dT%H%M%SZ).XXXXXXXX")
+prod exec -T db sh -ec \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -uroot --single-transaction --quick --no-tablespaces --set-gtid-purged=OFF --skip-add-drop-table "$MYSQL_DATABASE"' \
+  | gzip > "$backup"
+gzip -t "$backup"
+mv "$backup" "${backup%.part}"
+printf 'Verified backup %s\n' "${backup%.part}"
+
+git merge --ff-only "$expected_sha"
+test "$(git rev-parse HEAD)" = "$expected_sha"
+prod config --quiet
+prod pull db caddy
+caddy_image=$(prod config --images | awk '/^caddy:/{print}')
+test -n "$caddy_image"
+sudo docker run --rm --network none \
+  --mount "type=bind,src=$PWD/deploy/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
+  "$caddy_image" caddy validate --config /etc/caddy/Caddyfile
+
+prod up -d --build --force-recreate --wait --wait-timeout 180
+after=$(snapshot_state)
+test "$before" = "$after"
+printf '%s\n' "$after"
+
+base=https://companywatch-sf.austriaeast.cloudapp.azure.com
+test "$(curl -fsS --max-time 20 "$base/health/ready")" = '{"status":"ready"}'
+curl -fsS --max-time 20 -o /dev/null "$base/openapi.json"
+curl -fsS --max-time 20 -o /dev/null "$base/api/web/v1/versions"
+test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/api/v1/versions")" = 401
+prod ps -a
+```
+
+If verification fails after the schema update, keep the backup and volumes.
+Check readiness and the migration revision before choosing a recovery action.
+An earlier API image expects its own Alembic head.
+
+## 6. Bootstrap the first administrator
+
+From your interactive SSH terminal on the VM, run after the update succeeds.
+
+```bash
+cd "$HOME/companywatch"
+sudo docker compose --env-file .env.production -f compose.prod.yaml \
+  -p companywatch-live exec api python -m app.auth.cli bootstrap-admin
+```
+
+Enter your email and the password twice at the prompts. The password is hidden
+and the command persists its Argon2id hash. See the
+[operator access contract](agents/CONTRACTS.md#c-004--operator-sessions-and-api-access).

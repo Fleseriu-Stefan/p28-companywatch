@@ -38,6 +38,15 @@ def classify(row):
     return "classification_unknown"
 
 
+def parse_registration_date(value):
+    for pattern in ("%d/%m/%Y", "%d/%m/%Y %H:%M:%S"):
+        try:
+            return datetime.strptime(value, pattern).date()
+        except ValueError:
+            continue
+    return None
+
+
 def project(row):
     result = {target: row[source] or None for source, target in RETAINED.items()}
     errors = []
@@ -60,13 +69,6 @@ def project(row):
     if not result["name"] or not result["name"].strip():
         errors.append("name_missing")
     date = result["registration_date"]
-    if date:
-        for pattern in ("%d/%m/%Y", "%d/%m/%Y %H:%M:%S"):
-            try:
-                datetime.strptime(date, pattern)
-                break
-            except ValueError:
-                continue
-        else:
-            errors.append("registration_date_invalid")
+    if date and parse_registration_date(date) is None:
+        errors.append("registration_date_invalid")
     return result, errors

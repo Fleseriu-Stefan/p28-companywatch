@@ -1,10 +1,11 @@
 from alembic import context
 
+from app.auth.models import metadata as auth_metadata
 from app.config import Settings
 from app.db import create_database_engine
 from app.etl.models import metadata
 
-target_metadata = metadata
+target_metadata = [metadata, auth_metadata]
 
 
 def run_migrations() -> None:

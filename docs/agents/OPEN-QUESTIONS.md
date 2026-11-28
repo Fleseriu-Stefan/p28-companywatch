@@ -19,7 +19,7 @@
 - Q-008 · Can the verified legal-entity subset be extended?
 - Q-009 · How often should scheduled ETL check for ONRC updates?
 - Q-010 · How should the real SQL diff benchmark be measured? · _answered_
-- Q-011 · What API request limits and quotas should apply?
+- Q-011 · What API request limits and quotas should apply? · _answered_
 - Q-012 · Can the accountant supply a verified, anonymized example if needed?
 - Q-013 · Does delayed InnoDB purge make retry batches revisit deleted index entries? · _deferred_
 - Q-014 · Can idempotent ingest reuse avoid holding the publication pointer lock? · _deferred_
@@ -88,10 +88,10 @@
 - **Confirmed:** 2026-11-27
 
 ## Q-011 · What API request limits and quotas should apply?
-- **Status:** open
-- **Blocks:** Production limit values and quota windows.
-- **Who answers:** Project owner after the applicable deployment is known.
-- **Partial answer:** External API requests require valid keys, rate limits and quotas. Public dashboard routes need appropriate protections without visitor accounts. See D-011.
+- **Status:** answered
+- **Who answers:** Project owner.
+- **Answer:** The owner approved 60 requests per fixed UTC minute per API key and 5,000 requests per key per UTC calendar day, counted in MySQL. Dashboard reads allow 120 per minute per client IP, using the IP forwarded by Caddy in production. An exhausted limit returns 429 and `Retry-After`. See C-004.
+- **Confirmed:** 2026-11-28
 
 ## Q-012 · Can the accountant supply a verified, anonymized example if needed?
 - **Status:** open
