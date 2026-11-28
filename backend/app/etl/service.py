@@ -862,7 +862,15 @@ class Pipeline:
 
         return compare(self.engine, old_id, new_id, allow_synthetic=self.allow_synthetic)
 
-    def diff_details(self, old_id, new_id):
+    def diff_details(self, old_id, new_id, *, after=None, change_type=None, limit=None):
         from app.etl.diff import compare_details
 
-        return compare_details(self.engine, old_id, new_id, allow_synthetic=self.allow_synthetic)
+        return compare_details(
+            self.engine,
+            old_id,
+            new_id,
+            allow_synthetic=self.allow_synthetic,
+            after=after,
+            change_type=change_type,
+            limit=limit,
+        )

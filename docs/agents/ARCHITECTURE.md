@@ -8,15 +8,16 @@
 ## Overview
 M1 implements the technical foundation selected in D-003–D-005.
 The frontend has build tooling and a React entry rendering null; it has no visual UI.
-The backend exposes the health/documentation contract C-001. M2 adds a Docker CLI
-and minimal legal-entity ETL snapshots under C-002, with synthetic verification.
+The backend exposes health and OpenAPI under C-001. M2 adds a Docker CLI and
+minimal legal-entity ETL snapshots under C-002. The public visitor API exposes
+published version, company, history, diff and aggregate reads under C-003.
 Q-004 records the approved Draft 1 design for future UI implementation. Q-005
 records validation and publication of both ONRC editions in the local database.
 
 ## Parts
 | Part | Path | Responsibility | Talks to |
 |---|---|---|---|
-| API | backend/app/ | FastAPI, configuration, SQL connection and health | MySQL |
+| API | backend/app/ | FastAPI, health, and published ONRC read routes | MySQL |
 | Migrations | backend/migrations/ | Alembic baseline and revision tracking | MySQL |
 | ETL | backend/app/etl/ | Temporary download, parse/filter, staged validation, review/approval/publication and SQL diff | MySQL, approved ONRC resources only after explicit consent |
 | Database | compose.yaml: db | MySQL with persistent named volume | API and migrations |
@@ -32,7 +33,7 @@ records validation and publication of both ONRC editions in the local database.
 
 ```mermaid
 flowchart LR
-    Client["Local API client"] --> API["FastAPI · health and OpenAPI"]
+    Client["API client"] --> API["FastAPI · health and published reads"]
     subgraph Compose["M2 Compose project"]
         API -->|"readiness"| DB["MySQL · project volume"]
         DB -->|"healthy"| Migrate["Alembic · explicit opt-in"]
@@ -48,7 +49,8 @@ flowchart LR
 M1 established the Docker startup order and the FastAPI health routes. Liveness
 checks the API process. Readiness queries MySQL and compares the current Alembic
 revision with the application's heads. The original M1 revision is
-`0001_baseline`; an initialized M2 database uses `0002_etl`. The React entry
+`0001_baseline`. M2 adds `0002_etl`, and the visitor API adds search indexes
+in `0003_public_api_indexes`. The React entry
 point renders no dashboard and does not consume the API.
 [Health contract C-001](CONTRACTS.md#c-001--health-and-api-documentation)
 
@@ -120,6 +122,8 @@ was introduced for M2: HTTPX, SQLAlchemy and the standard library are reused.
 
 ## Boundaries
 The API owns C-001 in CONTRACTS.md. Consumers are the Compose healthcheck, tests
-and verification script. There are no frontend API consumers or external dataset
-HTTP contracts yet. C-002 describes ETL consumers and published-snapshot semantics.
+and verification script. C-002 describes ETL consumers and published-snapshot
+semantics. [C-003](CONTRACTS.md#c-003--public-onrc-visitor-api) defines the visitor
+API. Its queries use the published tables directly and share SQL diff logic with
+the ETL CLI. No React consumer is wired yet.
 See ../M2-ETL.md for the ingestion and publication procedure.

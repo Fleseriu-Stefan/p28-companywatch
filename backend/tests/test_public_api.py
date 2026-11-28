@@ -18,7 +18,7 @@ NOVEMBER = "2026-11-04"
 @pytest.fixture
 def published_data(engine):
     """Use fictional rows in the isolated MySQL project."""
-    ids = [str(uuid4()) for _ in range(3)]
+    ids = sorted((str(uuid4()) for _ in range(3)), reverse=True)
     pointer = publications.c.dataset == DATASET
     with engine.begin() as connection:
         previous = connection.scalar(select(publications.c.current_version_id).where(pointer))
@@ -27,8 +27,12 @@ def published_data(engine):
             (OCTOBER, NOVEMBER, "2026-12-01"),
             ("published", "approved", "review"),
             (
-                {"source_records": 8, "accepted_records": 5, "quarantined_records": 2,
-                 "excluded_records": 1},
+                {
+                    "source_records": 8,
+                    "accepted_records": 5,
+                    "quarantined_records": 2,
+                    "excluded_records": 1,
+                },
                 {"source_records": 20, "accepted_records": 5, "quarantined_records": 0},
                 {"source_records": 0, "accepted_records": 0, "quarantined_records": 0},
             ),
@@ -36,35 +40,56 @@ def published_data(engine):
         ):
             connection.execute(
                 insert(versions).values(
-                    id=version, edition=edition, state=state, report=report,
-                    resource_id=version, source_url="https://example.com/onrc",
-                    license="CC BY 4.0", source_kind="real", sha256="0" * 64,
-                    profile="test", schema_hash="1" * 64, created_at=datetime.now(UTC),
+                    id=version,
+                    edition=edition,
+                    state=state,
+                    report=report,
+                    resource_id=version,
+                    source_url="https://example.com/onrc",
+                    license="CC BY 4.0",
+                    source_kind="real",
+                    sha256="0" * 64,
+                    profile="test",
+                    schema_hash="1" * 64,
+                    created_at=datetime.now(UTC),
                     manifest={},
                 )
             )
         for version, rows in (
-            (ids[0], (
-                ("ROONRC.A", "BRAȘOV alpha", "31/01/2022", "BV"),
-                ("ROONRC.B", "BRAȘOV alpha", "01/12/2021", "BV"),
-                ("ROONRC.C", "BRAȘOV alpha", "01/12/2021 00:00:00", "BV"),
-                ("ROONRC.D", "ALT BRAȘOV", None, "BV"),
-                ("ROONRC.E", "OTHER", None, "CJ"),
-            )),
-            (ids[1], (
-                ("ROONRC.A", "BRAȘOV beta", "31/01/2022", "BV"),
-                ("ROONRC.B", "BRAȘOV alpha", "01/12/2021", "BV"),
-                ("ROONRC.C", "BRAȘOV alpha", "01/12/2021 00:00:00", "BV"),
-                ("ROONRC.E", "OTHER", None, "CJ"),
-                ("ROONRC.F", "NEW", None, None),
-            )),
+            (
+                ids[0],
+                (
+                    ("ROONRC.A", "BRAȘOV alpha", "31/01/2022", "BV"),
+                    ("ROONRC.B", "BRAȘOV alpha", "01/12/2021", "BV"),
+                    ("ROONRC.C", "BRAȘOV alpha", "01/12/2021 00:00:00", "BV"),
+                    ("ROONRC.D", "ALT BRAȘOV", None, "BV"),
+                    ("ROONRC.E", "OTHER", None, "CJ"),
+                ),
+            ),
+            (
+                ids[1],
+                (
+                    ("ROONRC.A", "BRAȘOV beta", "31/01/2022", "BV"),
+                    ("ROONRC.B", "BRAȘOV alpha", "01/12/2021", "BV"),
+                    ("ROONRC.C", "BRAȘOV alpha", "01/12/2021 00:00:00", "BV"),
+                    ("ROONRC.E", "OTHER", None, "CJ"),
+                    ("ROONRC.F", "NEW", None, None),
+                ),
+            ),
         ):
             connection.execute(
                 insert(companies),
                 [
-                    dict(version_id=version, euid=euid, name=name, county=county,
-                         registration_date=date, legal_form="SRL", locality="CENTRU",
-                         cui="42" if euid == "ROONRC.A" else None)
+                    dict(
+                        version_id=version,
+                        euid=euid,
+                        name=name,
+                        county=county,
+                        registration_date=date,
+                        legal_form="SRL",
+                        locality="CENTRU",
+                        cui="42" if euid == "ROONRC.A" else None,
+                    )
                     for euid, name, date, county in rows
                 ],
             )
@@ -74,16 +99,21 @@ def published_data(engine):
             yield client, ids
     finally:
         with engine.begin() as connection:
-            connection.execute(update(publications).where(pointer).values(current_version_id=previous))
+            connection.execute(
+                update(publications).where(pointer).values(current_version_id=previous)
+            )
             connection.execute(delete(companies).where(companies.c.version_id.in_(ids)))
             connection.execute(delete(versions).where(versions.c.id.in_(ids)))
 
 
 def publish(engine, version):
     with engine.begin() as connection:
-        connection.execute(update(versions).where(versions.c.id == version).values(state="published"))
         connection.execute(
-            update(publications).where(publications.c.dataset == DATASET)
+            update(versions).where(versions.c.id == version).values(state="published")
+        )
+        connection.execute(
+            update(publications)
+            .where(publications.c.dataset == DATASET)
             .values(current_version_id=version)
         )
 
@@ -97,8 +127,14 @@ def euids(response):
 def test_search_sort_and_cursor_survive_publication(published_data, engine):
     client, (old, new, _) = published_data
     path = PREFIX + "/companies"
-    params = {"name": "brasov", "name_match": "prefix", "county": "BV",
-              "locality": "CENTRU", "legal_form": "SRL", "limit": 1}
+    params = {
+        "name": "brasov",
+        "name_match": "prefix",
+        "county": "BV",
+        "locality": "CENTRU",
+        "legal_form": "SRL",
+        "limit": 1,
+    }
     first = client.get(path, params=params)
     assert euids(first) == ["ROONRC.A"]
     cursor = first.json()["next_cursor"]
@@ -109,14 +145,19 @@ def test_search_sort_and_cursor_survive_publication(published_data, engine):
     assert euids(client.get(path, params={"cui": "42"})) == ["ROONRC.A"]
     assert euids(client.get(path, params={"name": "%"})) == []
     assert euids(client.get(path, params={"name": "brasov"})) == [
-        "ROONRC.D", "ROONRC.A", "ROONRC.B", "ROONRC.C",
+        "ROONRC.D",
+        "ROONRC.A",
+        "ROONRC.B",
+        "ROONRC.C",
     ]
     date_params = {"version": old, "sort": "registration_date", "limit": 2}
     dates = client.get(path, params=date_params)
     assert euids(dates) == ["ROONRC.B", "ROONRC.C"]
     dates = client.get(path, params={**date_params, "cursor": dates.json()["next_cursor"]})
     assert euids(dates) == ["ROONRC.A", "ROONRC.D"]
-    assert euids(client.get(path, params={**date_params, "cursor": dates.json()["next_cursor"]})) == [
+    assert euids(
+        client.get(path, params={**date_params, "cursor": dates.json()["next_cursor"]})
+    ) == [
         "ROONRC.E",
     ]
 
@@ -154,6 +195,15 @@ def test_observed_history(published_data, engine):
     assert client.get(path, params={"as_of": "2026-02-31"}).status_code == 422
     assert client.get(path, params={"as_of": "1793750400"}).status_code == 422
     assert client.get(PREFIX + "/companies/roOnrc.a").json()["status"] == "absent"
+    # ASGI decodes percent-encoded slashes before FastAPI matches the route.
+    with engine.begin() as connection:
+        connection.execute(
+            update(companies)
+            .where(companies.c.version_id == old, companies.c.euid == "ROONRC.D")
+            .values(euid="ROONRC.J01/4/2020")
+        )
+    encoded = PREFIX + "/companies/ROONRC.J01%2F4%2F2020"
+    assert client.get(encoded, params={"as_of": OCTOBER}).json()["status"] == "present"
 
 
 @pytest.mark.integration
@@ -183,14 +233,18 @@ def test_diff_pages_and_aggregates(published_data, engine):
     assert client.get(path, params={"limit": 201}).status_code == 422
 
     url = PREFIX + "/aggregates"
-    aggregate = client.get(url, params=[("version", old), ("version", old), ("version", new)]).json()
+    aggregate = client.get(
+        url, params=[("version", old), ("version", old), ("version", new)]
+    ).json()
     assert [(group["edition"], group["count"]) for group in aggregate["by_legal_form"]] == [
-        (OCTOBER, 5), (NOVEMBER, 5),
+        (OCTOBER, 5),
+        (NOVEMBER, 5),
     ]
-    assert any(group["county"] is None and group["count"] == 1
-               for group in aggregate["by_county"])
-    assert [(row["quarantined_records"], row["excluded_records"])
-            for row in aggregate["quality_by_edition"]] == [(2, 1), (0, None)]
+    assert any(group["county"] is None and group["count"] == 1 for group in aggregate["by_county"])
+    assert [
+        (row["quarantined_records"], row["excluded_records"])
+        for row in aggregate["quality_by_edition"]
+    ] == [(2, 1), (0, None)]
     assert aggregate["average_quarantine_rate"] == 0.125
     publish(engine, third)
     zero = client.get(url, params={"version": third}).json()
@@ -203,8 +257,12 @@ def test_etags_follow_current_and_keep_explicit_versions_stable(published_data, 
     client, (old, new, third) = published_data
     publish(engine, new)
     latest = ["/versions", "/companies?limit=1", "/companies/ROONRC.A", "/aggregates"]
-    pinned = [f"/companies?version={old}", f"/versions/{old}/diff/{new}",
-              f"/aggregates?version={old}", f"/companies/ROONRC.A?as_of={OCTOBER}"]
+    pinned = [
+        f"/companies?version={old}",
+        f"/versions/{old}/diff/{new}",
+        f"/aggregates?version={old}",
+        f"/companies/ROONRC.A?as_of={OCTOBER}",
+    ]
     tags = {}
     for path in latest + pinned:
         response = client.get(PREFIX + path)
@@ -226,11 +284,36 @@ def test_etags_follow_current_and_keep_explicit_versions_stable(published_data, 
             assert response.headers["etag"] == tags[path]
 
 
+@pytest.mark.integration
+def test_same_edition_tie_breaking_and_latest_validator(published_data, engine):
+    client, (old, _, replacement) = published_data
+    url = PREFIX + "/aggregates"
+    first = client.get(url)
+    with engine.begin() as connection:
+        connection.execute(
+            update(versions).where(versions.c.id == replacement).values(edition=OCTOBER)
+        )
+    publish(engine, replacement)
+    after = client.get(url, headers={"If-None-Match": first.headers["etag"]})
+    assert after.status_code == 200
+    assert after.json() == first.json()
+    assert after.headers["etag"] != first.headers["etag"]
+    assert client.get(url, params=[("version", old), ("version", replacement)]).status_code == 422
+    path = PREFIX + "/companies/ROONRC.A"
+    assert client.get(path).json()["version_id"] == replacement
+    assert client.get(path, params={"as_of": OCTOBER}).json()["version_id"] == old
+
+
 def test_openapi_documents_public_routes():
     with TestClient(create_app(MagicMock())) as client:
         paths = client.get("/openapi.json").json()["paths"]
-    for path in ("/versions", "/companies", "/companies/{euid}",
-                 "/versions/{a}/diff/{b}", "/aggregates"):
+    for path in (
+        "/versions",
+        "/companies",
+        "/companies/{euid}",
+        "/versions/{a}/diff/{b}",
+        "/aggregates",
+    ):
         operation = paths[PREFIX + path]["get"]
         assert "ETag" in operation["responses"]["200"]["headers"]
         assert "304" in operation["responses"]

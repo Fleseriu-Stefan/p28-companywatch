@@ -20,7 +20,8 @@ def run_migrations() -> None:
             context.run_migrations()
         return
 
-    engine = create_database_engine(settings)
+    # Index builds on populated snapshots run longer than normal API reads.
+    engine = create_database_engine(settings, read_timeout=120)
     try:
         with engine.connect() as connection:
             context.configure(connection=connection, target_metadata=target_metadata)

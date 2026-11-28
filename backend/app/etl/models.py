@@ -92,6 +92,20 @@ companies = Table(
     mysql_engine="InnoDB",
     mysql_charset="utf8mb4",
 )
+Index(
+    "ix_company_version_name",
+    companies.c.version_id,
+    companies.c.name,
+    mysql_length={"name": 191},
+)
+Index("ix_company_version_cui", companies.c.version_id, companies.c.cui)
+Index(
+    "ix_company_version_county_locality",
+    companies.c.version_id,
+    companies.c.county,
+    companies.c.locality,
+    mysql_length={"county": 191, "locality": 191},
+)
 # One physical row per version/key; duplicate groups exist only in staging.
 publications = Table(
     "dataset_publications",

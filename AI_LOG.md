@@ -1,5 +1,13 @@
 # AI log
 
+## 2026-11-28 · Public ONRC visitor API
+
+- **Tool** — Codex.
+- **What I asked** — Plan and build the public published-data API with observed history, diffs, aggregates, stable pagination and conditional reads. Add and verify company search indexes, then redeploy after green CI.
+- **What I got** — Five visitor routes, Pydantic OpenAPI schemas, C-003, an Alembic index migration, and tests covering accent-insensitive name search, observed states and pinned versus latest ETags. [Public API contract](docs/agents/CONTRACTS.md#c-003--public-onrc-visitor-api).
+- **Local evidence** — On the real local snapshots, EXPLAIN selected the new indexes for CUI and county/locality. Accent-insensitive name search and the name/date sorts used a version range and filesort. The index migration preserved both published counts and the current pointer.
+- **What I did with it** — Approved the contract choices, company indexes, current-edition lookups without a date, and 50-row default and 200-row maximum page sizes.
+
 ## 2026-11-28 · Minimal Azure production deployment
 
 - **Tool** — Codex.
